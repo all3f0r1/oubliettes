@@ -3,7 +3,9 @@ package app.oubliettes
 import android.content.SharedPreferences
 import android.media.AudioManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -14,6 +16,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -43,9 +48,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -67,28 +72,49 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import app.oubliettes.game.Puzzle
-import app.oubliettes.game.drawing
+import app.oubliettes.game.TutorialStep
+import app.oubliettes.game.decodePuzzle
 import app.oubliettes.game.generate
-import app.oubliettes.game.isSolved
 import app.oubliettes.game.tutorialPuzzle
 import app.oubliettes.game.tutorialSteps
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 private val SIZES = listOf(8, 10, 12)
 private val DIFFICULTIES = listOf("Easy", "Medium", "Hard") // one per entry of SIZES
 
-/** Campaign levels per difficulty. Level n of a size is always the same grid (its seed is n). */
+/**
+ * Campaign levels per difficulty. The grids are frozen in res/raw/campaign.txt, one per line, the
+ * 50 of each size in turn: they stay the same whatever becomes of the generator. (They are what
+ * the generator of 0.4 gave for seeds 1 to 50.)
+ */
 private const val LEVELS = 50
+
+private val RULES = listOf(
+    "The numbers give how many walls their row or column holds.",
+    "A number turns green and underlined once its count is reached, which does not prove the walls " +
+        "are the right ones. It turns red and struck through when there are too many.",
+    "Monsters and chests are never walls.",
+    "Every monster sits in a dead end, and every dead end holds a monster.",
+    "Every chest is in a treasure room: 3×3 open cells, a single chest (anywhere in the room) and a single opening.",
+    "Outside treasure rooms, hallways are one cell wide: no open 2×2 block.",
+    "All open cells are connected.",
+    "Walls are never more than two cells thick: no 3×3 block of walls.",
+    "Tap a cell to change it: wall, dot (known open), blank. Drag to fill a row or a column with " +
+        "what the first cell became; a drag only fills blank cells and those of your previous action.",
+)
 
 private val StoneShade = ColorFilter.tint(Color(0xFF4A475C), BlendMode.Modulate)
 
@@ -99,16 +125,23 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The app is dark whatever the system theme: light icons in the status and navigation bars.
+        enableEdgeToEdge(SystemBarStyle.dark(0), SystemBarStyle.dark(0))
         volumeControlStream = AudioManager.STREAM_MUSIC
         val prefs = getPreferences(MODE_PRIVATE)
         audio = Audio(applicationContext, prefs)
+        // Calm by default when the system animations are turned off.
+        val still = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        Comfort.calm = prefs.getBoolean("calm", still)
+        Comfort.plainDigits = prefs.getBoolean("plainDigits", false)
+        Comfort.magnifier = prefs.getBoolean("magnifier", true)
+        val campaign = resources.openRawResource(R.raw.campaign).bufferedReader().use { it.readLines() }.map { decodePuzzle(it)!! }
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(primary = Gold, onPrimary = Bg, background = Bg, surface = Bg, onSurface = Ink),
             ) {
                 Surface(Modifier.fillMaxSize()) {
-                    ProvideTextStyle(TextStyle(fontFamily = Almendra, fontSize = 17.sp)) { App(prefs, audio) }
+                    ProvideTextStyle(TextStyle(fontFamily = Almendra, fontSize = 17.sp)) { App(prefs, audio, campaign) }
                 }
             }
         }
@@ -131,7 +164,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(prefs: SharedPreferences, audio: Audio) {
+private fun App(prefs: SharedPreferences, audio: Audio, campaign: List<Puzzle>) {
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
     var level by rememberSaveable { mutableIntStateOf(0) } // campaign level on screen, 0 for the table of levels
     val toMenu = { screen = Screen.MENU }
@@ -139,8 +172,32 @@ private fun App(prefs: SharedPreferences, audio: Audio) {
     LaunchedEffect(inGrid) { audio.setMenu(!inGrid) }
     BackHandler(enabled = screen != Screen.MENU) { if (screen == Screen.CAMPAIGN && level != 0) level = 0 else toMenu() }
     when (screen) {
-        Screen.MENU -> Menu(prefs.all.keys.count { it.startsWith("done") }) { screen = it }
-        Screen.CAMPAIGN -> Campaign(prefs, audio, level, { level = it }, toMenu)
+        Screen.MENU -> {
+            // The grid opened last: "C:size:level" in the campaign, "E:size" in Endless.
+            val last = prefs.getString("last", "")!!.split(':')
+            val size = last.getOrNull(1)?.toIntOrNull()?.takeIf { it in SIZES }
+            val lastLevel = last.getOrNull(2)?.toIntOrNull()?.takeIf { it in 1..LEVELS }
+            val resume = when {
+                size == null -> null
+                last[0] == "E" -> "Endless · $size×$size"
+                last[0] == "C" && lastLevel != null -> "${DIFFICULTIES[SIZES.indexOf(size)]} · Level $lastLevel"
+                else -> null
+            }
+            Menu(
+                prefs.all.keys.count { it.startsWith("done") }, resume,
+                onResume = {
+                    if (lastLevel != null) {
+                        prefs.edit().putInt("campaignSize", size!!).apply()
+                        level = lastLevel
+                        screen = Screen.CAMPAIGN
+                    } else {
+                        prefs.edit().putInt("endlessSize", size!!).apply()
+                        screen = Screen.ENDLESS
+                    }
+                },
+            ) { level = 0; screen = it }
+        }
+        Screen.CAMPAIGN -> Campaign(prefs, audio, campaign, level, { level = it }, toMenu)
         Screen.ENDLESS -> Endless(prefs, audio, toMenu)
         Screen.TUTORIAL -> Tutorial(toMenu) { level = 0; screen = Screen.CAMPAIGN }
         Screen.OPTIONS -> Options(prefs, audio, toMenu)
@@ -148,15 +205,19 @@ private fun App(prefs: SharedPreferences, audio: Audio) {
 }
 
 @Composable
-private fun Menu(solved: Int, open: (Screen) -> Unit) {
+private fun Menu(solved: Int, resume: String?, onResume: () -> Unit, open: (Screen) -> Unit) {
     val wall = painterResource(R.drawable.wall)
     val torch = torchFrames()
     val chest = chestFrames()
     val bodies = monsterBodies()
     val tick = rememberTick()
-    val flicker by rememberInfiniteTransition(label = "torch").animateFloat(
-        0.7f, 1f, infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse), label = "flicker",
-    )
+    val flame = if (Comfort.calm) {
+        null
+    } else {
+        rememberInfiniteTransition(label = "torch").animateFloat(
+            0.7f, 1f, infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse), label = "flicker",
+        )
+    }
     Box(
         Modifier.fillMaxSize().drawBehind {
             // A dungeon wall in the dark: staggered stone blocks, lit by two flickering torches.
@@ -169,7 +230,8 @@ private fun Menu(solved: Int, open: (Screen) -> Unit) {
                 }
             }
             val torchSize = size.width * 0.16f
-            for ((index, x) in listOf(size.width * 0.14f, size.width * 0.86f).withIndex()) {
+            val flicker = flame?.value ?: 1f
+            for ((index, x) in listOf(size.width * 0.09f, size.width * 0.91f).withIndex()) {
                 val flame = Offset(x, size.height * 0.13f)
                 drawCircle(
                     Brush.radialGradient(listOf(Color(0xFFF08A2A).copy(alpha = 0.5f * flicker), Color.Transparent), flame, size.width * 0.6f),
@@ -183,7 +245,8 @@ private fun Menu(solved: Int, open: (Screen) -> Unit) {
         },
     ) {
         Column(
-            Modifier.safeDrawingPadding().fillMaxSize().padding(24.dp),
+            // Scrolls when the planks do not fit: short screens, large fonts.
+            Modifier.safeDrawingPadding().fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -194,6 +257,7 @@ private fun Menu(solved: Int, open: (Screen) -> Unit) {
             )
             Text("Find the dungeon walls", color = Ink, fontStyle = FontStyle.Italic, fontSize = 19.sp)
             Spacer(Modifier.height(12.dp))
+            if (resume != null) Plank("Continue", resume, onResume)
             Plank("Campaign", "$solved / ${LEVELS * SIZES.size} solved") { open(Screen.CAMPAIGN) }
             Plank("Endless", "Random grids") { open(Screen.ENDLESS) }
             Plank("Tutorial", "A step-by-step solve") { open(Screen.TUTORIAL) }
@@ -235,36 +299,65 @@ private fun Plank(title: String, detail: String, onClick: () -> Unit) {
     }
 }
 
-/** Shared frame of the inner screens: a way back, a title, then the content. */
+/**
+ * Shared frame of the inner screens: a way back, a title, then the content. It scrolls when the
+ * content is taller than the screen, unless the content does its own scrolling ([scroll] false).
+ * [rules] adds a button showing the rules without leaving the screen.
+ */
 @Composable
-private fun Page(title: String, onBack: () -> Unit, back: String = "Menu", content: @Composable () -> Unit) {
+private fun Page(
+    title: String,
+    onBack: () -> Unit,
+    back: String = "Menu",
+    rules: Boolean = false,
+    scroll: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    var showRules by rememberSaveable { mutableStateOf(false) }
     Column(
-        Modifier.safeDrawingPadding().padding(16.dp),
+        Modifier.safeDrawingPadding().then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             PlankButton(back, Modifier.align(Alignment.CenterStart), onClick = onBack)
             Text(title, color = Gold, fontFamily = Fraktur, fontSize = 30.sp)
+            if (rules) PlankButton("Rules", Modifier.align(Alignment.CenterEnd)) { showRules = true }
         }
         content()
+    }
+    if (showRules) {
+        val shape = RoundedCornerShape(8.dp)
+        Dialog({ showRules = false }) {
+            Column(
+                Modifier.clip(shape).background(Bg).border(2.dp, Gold, shape).verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Rules", color = Gold, fontFamily = Fraktur, fontSize = 28.sp)
+                for (rule in RULES) Text(rule, Modifier.fillMaxWidth(), color = Ink, fontSize = 16.sp, lineHeight = 20.sp)
+                PlankButton("Close") { showRules = false }
+            }
+        }
     }
 }
 
 /** The table of levels of one difficulty, or the level being played when [level] is not 0. */
 @Composable
-private fun Campaign(prefs: SharedPreferences, audio: Audio, level: Int, open: (Int) -> Unit, onMenu: () -> Unit) {
+private fun Campaign(prefs: SharedPreferences, audio: Audio, campaign: List<Puzzle>, level: Int, open: (Int) -> Unit, onMenu: () -> Unit) {
     var size by rememberSaveable { mutableIntStateOf(prefs.getInt("campaignSize", SIZES[0])) }
     if (level != 0) {
+        LaunchedEffect(size, level) { prefs.edit().putString("last", "C:$size:$level").apply() }
         Game(
             prefs, audio, "Campaign", onBack = { open(0) }, back = "Levels",
-            size = size, seed = level.toLong(), marksKey = "marks${size}_$level", doneKey = "done${size}_$level",
-            status = "${DIFFICULTIES[SIZES.indexOf(size)]} · Level $level",
+            puzzle = campaign[SIZES.indexOf(size) * LEVELS + level - 1], saveKey = "marks${size}_$level", legacyId = "$level",
+            variety = level, status = "${DIFFICULTIES[SIZES.indexOf(size)]} · Level $level",
             next = "Next level", onNext = { open(if (level < LEVELS) level + 1 else 0) },
+            onSolved = { prefs.edit().putString("done${size}_$level", it).apply() },
         )
         return
     }
-    Page("Campaign", onMenu) {
+    Page("Campaign", onMenu, scroll = false) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((index, s) in SIZES.withIndex()) {
                 PlankButton("${DIFFICULTIES[index]}\n$s×$s", Modifier.weight(1f), selected = s == size) {
@@ -280,21 +373,28 @@ private fun Campaign(prefs: SharedPreferences, audio: Audio, level: Int, open: (
         ) {
             items(LEVELS) { index ->
                 val done = prefs.getString("done${size}_${index + 1}", null)?.takeIf { it.length == size * size }
-                LevelTile(index + 1, done, size) { open(index + 1) }
+                // A save holds its marks after the first colon: begun once any cell is marked.
+                val begun = prefs.getString("marks${size}_${index + 1}", "")!!.split(':').getOrNull(1)?.any { it != '0' } == true
+                LevelTile(index + 1, done, begun, size) { open(index + 1) }
             }
         }
     }
 }
 
-/** A stone slab bearing the level number; once solved, a small picture of the finished dungeon. */
+/**
+ * A stone slab bearing the level number. A level begun is rimmed in gold and says so; a solved one
+ * shows a small picture of the finished dungeon.
+ */
 @Composable
-private fun LevelTile(number: Int, done: String?, size: Int, onClick: () -> Unit) {
+private fun LevelTile(number: Int, done: String?, begun: Boolean, size: Int, onClick: () -> Unit) {
     val stone = painterResource(R.drawable.wall)
-    Box(
+    val shape = RoundedCornerShape(4.dp)
+    Column(
         Modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(shape)
             .clickable(role = Role.Button, onClick = onClick)
+            .semantics { stateDescription = if (done != null) "solved" else if (begun) "begun" else "not started" }
             .drawBehind {
                 if (done == null) {
                     with(stone) { draw(this@drawBehind.size, colorFilter = StoneShade) }
@@ -311,14 +411,17 @@ private fun LevelTile(number: Int, done: String?, size: Int, onClick: () -> Unit
                         drawRect(color, Offset(i % size * cell, i / size * cell), Size(cell + 1, cell + 1))
                     }
                 }
-            },
-        contentAlignment = Alignment.Center,
+            }
+            .then(if (begun && done == null) Modifier.border(2.dp, Gold, shape) else Modifier),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             "$number",
             color = if (done == null) Ink else Color.White,
             style = TextStyle(fontFamily = Almendra, fontWeight = FontWeight.Bold, fontSize = 22.sp, shadow = Shadow(Color.Black, Offset(0f, 2f), 6f)),
         )
+        if (begun && done == null) Text("begun", color = Gold, fontSize = 12.sp, lineHeight = 12.sp)
     }
 }
 
@@ -330,28 +433,74 @@ private fun Endless(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) 
     var size by remember { mutableIntStateOf(prefs.getInt("endlessSize", SIZES[0])) }
     var seed by remember(size) { mutableLongStateOf(endlessSeed(prefs, size)) }
     var solvedCount by remember { mutableIntStateOf(prefs.getInt("solved", 0)) }
-    LaunchedEffect(size, seed) { prefs.edit().putInt("endlessSize", size).putLong("seed$size", seed).apply() }
-    Game(
-        prefs, audio, "Endless", onMenu,
-        size = size, seed = seed, marksKey = "marksE$size", doneKey = null,
-        status = "$solvedCount solved",
-        header = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (s in SIZES) PlankButton("$s×$s", selected = s == size) { size = s }
+    val status = "$solvedCount solved"
+    val sizes = @Composable {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (s in SIZES) PlankButton("$s×$s", selected = s == size) { size = s }
+        }
+    }
+    // One grid: leaving it (another size, the next grid, the menu) cancels its digging.
+    key(size, seed) {
+        // The grid itself is saved next to its seed, so a save never depends on the generator giving it again.
+        var puzzle by remember {
+            mutableStateOf(prefs.getString("puzzleE$size", "")!!.takeIf { it.startsWith("$seed;") }?.let { decodePuzzle(it.substringAfter(';')) })
+        }
+        var failed by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            prefs.edit().putInt("endlessSize", size).putLong("seed$size", seed).putString("last", "E:$size").apply()
+            if (puzzle != null) return@LaunchedEffect
+            val dug = withContext(Dispatchers.Default) { generate(size, size, seed) { !isActive } }
+            if (dug == null) {
+                failed = true
+            } else {
+                prefs.edit().putString("puzzleE$size", "$seed;${dug.encode()}").apply()
+                puzzle = dug
             }
-        },
-        next = "Next grid",
-        onNext = {
-            solvedCount++
-            prefs.edit().putInt("solved", solvedCount).apply()
-            seed = Random.nextLong()
-        },
-    )
+        }
+        val p = puzzle
+        if (p != null) {
+            Game(
+                prefs, audio, "Endless", onMenu,
+                puzzle = p, saveKey = "marksE$size", legacyId = "$seed",
+                variety = seed.toInt(), status = status, header = sizes,
+                next = "Next grid", onNext = { seed = Random.nextLong() },
+                // A grid counts the moment it is solved, and only once however often it is solved again.
+                onSolved = {
+                    if (!prefs.contains("counted$size") || prefs.getLong("counted$size", 0) != seed) {
+                        solvedCount++
+                        prefs.edit().putInt("solved", solvedCount).putLong("counted$size", seed).apply()
+                    }
+                },
+            )
+        } else {
+            Page("Endless", onMenu) {
+                sizes()
+                Text(status, color = Dim)
+                val torch = torchFrames()
+                val tick = rememberTick()
+                Column(
+                    Modifier.fillMaxWidth().aspectRatio(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (failed) {
+                        Text("The diggers gave up on this one.", color = Dim, fontStyle = FontStyle.Italic)
+                        PlankButton("Dig another") { seed = Random.nextLong() }
+                    } else {
+                        Canvas(Modifier.size(72.dp)) { with(torch[tick.value % torch.size]) { draw(this@Canvas.size) } }
+                        Text("Digging…", color = Dim, fontStyle = FontStyle.Italic)
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
- * One grid, generated from [size] and [seed]. Marks are saved under [marksKey] after every move; the
- * finished dungeon is saved under [doneKey] when there is one. [onNext] is only offered once solved.
+ * One grid being played. Marks and their history are saved under [saveKey] after every action;
+ * [legacyId] is what a save of 0.4 was tagged with. [onSolved] receives the picture of the finished
+ * dungeon, the moment it is solved and again whenever a solved grid is reopened. [onNext] is only
+ * offered once solved.
  */
 @Composable
 private fun Game(
@@ -360,22 +509,17 @@ private fun Game(
     title: String,
     onBack: () -> Unit,
     back: String = "Menu",
-    size: Int,
-    seed: Long,
-    marksKey: String,
-    doneKey: String?,
+    puzzle: Puzzle,
+    saveKey: String,
+    legacyId: String,
+    variety: Int,
     status: String,
     header: @Composable () -> Unit = {},
     next: String,
     onNext: () -> Unit,
+    onSolved: (picture: String) -> Unit,
 ) {
-    var puzzle by remember { mutableStateOf<Puzzle?>(null) }
-    var marks by remember { mutableStateOf(IntArray(0)) }
-    // ponytail: undo history lives in memory only, it is gone after leaving the grid or the app.
-    val history = remember(size, seed) { mutableStateListOf<IntArray>() }
-    // Reset cannot be undone, so it asks twice: the first tap arms it for a few seconds.
-    var armed by remember(size, seed) { mutableStateOf(false) }
-    val confirmReset = remember { prefs.getBoolean("confirmReset", true) }
+    val session = remember(puzzle) { Session(puzzle, prefs.getString(saveKey, null), legacyId) }
     val haptics = remember { prefs.getBoolean("haptics", true) }
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
@@ -384,104 +528,76 @@ private fun Game(
         view.keepScreenOn = prefs.getBoolean("keepScreenOn", true)
         onDispose { view.keepScreenOn = false }
     }
-    if (armed) LaunchedEffect(Unit) { delay(3000); armed = false }
+    LaunchedEffect(session) { if (session.solved) onSolved(session.picture()) }
 
-    LaunchedEffect(size, seed) {
-        puzzle = null
-        val generated = withContext(Dispatchers.Default) { generate(size, size, seed) }
-        // Saved marks are only reused when they belong to this exact grid.
-        val saved = prefs.getString(marksKey, "")!!.removePrefix("$seed:")
-        marks = if (saved.length == size * size && saved.all { it in '0'..'2' }) {
-            IntArray(saved.length) { saved[it] - '0' }
-        } else {
-            IntArray(size * size)
-        }
-        puzzle = generated
+    /** Wraps a button's action: a click, and the save. */
+    fun act(action: () -> Unit) = {
+        action()
+        audio.play(audio.click)
+        prefs.edit().putString(saveKey, session.save()).apply()
     }
 
-    fun update(new: IntArray) {
-        marks = new
-        prefs.edit().putString(marksKey, "$seed:${new.joinToString("")}").apply()
-    }
-
-    val p = puzzle
-    val solved = p != null && isSolved(p, BooleanArray(marks.size) { marks[it] == WALL })
-
-    Page(title, onBack, back) {
+    Page(title, onBack, back, rules = true) {
         header()
         Text(status, color = Dim)
-        if (p == null) {
-            val torch = torchFrames()
-            val tick = rememberTick()
-            Column(
-                Modifier.fillMaxWidth().aspectRatio(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Canvas(Modifier.size(72.dp)) { with(torch[tick.value % torch.size]) { draw(this@Canvas.size) } }
-                Text("Digging…", color = Dim, fontStyle = FontStyle.Italic)
-            }
-        } else {
-            Board(
-                p, marks, locked = solved, celebrate = solved, variety = seed.toInt(),
-                onStroke = { history += marks; armed = false },
-                liveMarks = { marks },
-                // The cells the previous action changed: a drag may paint over those.
-                repaintable = { history.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet() },
-            ) { cell, value ->
-                val new = marks.copyOf().also { it[cell] = value }
-                update(new)
-                val walls = BooleanArray(new.size) { new[it] == WALL }
-                val won = isSolved(p, walls)
+        Board(
+            session, locked = session.solved, celebrate = session.solved, variety = variety,
+            onPaint = {
+                audio.play(audio.click)
+                if (haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            },
+            onStroke = { won ->
+                prefs.edit().putString(saveKey, session.save()).apply()
                 if (won) {
                     audio.victory()
-                    if (doneKey != null) prefs.edit().putString(doneKey, drawing(p, walls)).apply()
-                } else {
-                    audio.play(audio.click)
+                    if (haptics) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onSolved(session.picture())
                 }
-                if (haptics) haptic.performHapticFeedback(if (won) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove)
+            },
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (session.solved) {
+                PlankButton("Play again", onClick = act(session::reset))
+                PlankButton(next, onClick = onNext)
+            } else {
+                PlankButton("Undo", enabled = session.canUndo, onClick = act(session::undo))
+                PlankButton("Redo", enabled = session.canRedo, onClick = act(session::redo))
+                PlankButton("Reset", enabled = session.marks.any { it != 0 }, onClick = act(session::reset))
             }
-            Text(if (solved) "Dungeon solved!" else "", color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PlankButton("Undo", enabled = history.isNotEmpty() && !solved) {
-                    update(history.removeAt(history.lastIndex))
-                    audio.play(audio.click)
-                }
-                PlankButton(if (armed) "Sure?" else "Reset", enabled = marks.any { it != 0 }) {
-                    if (confirmReset && !armed) {
-                        armed = true
-                    } else {
-                        armed = false
-                        history.clear()
-                        update(IntArray(size * size))
-                    }
-                }
-                PlankButton(next, enabled = solved, onClick = onNext)
-            }
+        }
+        if (session.solved) {
+            Text("Dungeon solved!", color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        } else {
+            Text("Tap: wall, dot, blank · Drag: fill a line", color = Dim, fontSize = 15.sp)
         }
     }
 }
 
-/** Replays a fixed solve one deduction at a time. */
+private fun Session.show(step: TutorialStep) {
+    paint(step.walls, WALL)
+    paint(step.open, KNOWN_OPEN)
+}
+
+/** A fixed solve, one deduction at a time: the player marks the cells of each step, or asks to be shown. */
 @Composable
 private fun Tutorial(onMenu: () -> Unit, onPlay: () -> Unit) {
     var index by rememberSaveable { mutableIntStateOf(0) }
+    // Back after the process was killed, the steps already passed are marked again.
+    val session = remember { Session(tutorialPuzzle).also { s -> tutorialSteps.take(index).forEach { s.show(it) } } }
     val step = tutorialSteps[index]
-    val p = tutorialPuzzle
-    val marks = IntArray(p.width * p.height)
-    for (done in tutorialSteps.take(index + 1)) {
-        done.walls.forEach { marks[it] = WALL }
-        done.open.forEach { marks[it] = KNOWN_OPEN }
-    }
+    val marks = session.marks
+    val left = step.walls.count { marks[it] != WALL } + step.open.count { marks[it] != KNOWN_OPEN }
     val last = index == tutorialSteps.lastIndex
 
-    Page("Tutorial", onMenu) {
+    Page("Tutorial", onMenu, rules = true) {
         Text("Step ${index + 1} / ${tutorialSteps.size}", color = Dim)
-        Board(p, marks, locked = true, celebrate = last, focus = step.focus)
-        Text(step.text, Modifier.fillMaxWidth().height(150.dp), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
+        Board(session, locked = last, celebrate = last && session.solved, focus = step.focus)
+        Text(step.text, Modifier.fillMaxWidth().heightIn(min = 130.dp), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
+        Text(if (left > 0) "Your turn: $left to mark" else "", color = Gold, fontStyle = FontStyle.Italic)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PlankButton("Back", enabled = index > 0) { index-- }
-            PlankButton(if (last) "Play" else "Next") { if (last) onPlay() else index++ }
+            PlankButton("Show me", enabled = left > 0) { session.show(step) }
+            PlankButton(if (last) "Play" else "Next", enabled = left == 0) { if (last) onPlay() else index++ }
         }
     }
 }
@@ -498,20 +614,21 @@ private fun Toggle(text: String, checked: Boolean, onChange: (Boolean) -> Unit) 
     }
 }
 
-/** A comfort setting, on unless turned off. Read where it is used with the same [key]. */
+/** A setting kept under [key], [default] until changed. Read where it is used with the same key; [onChange] applies it at once. */
 @Composable
-private fun PrefToggle(prefs: SharedPreferences, key: String, text: String) {
-    var on by remember { mutableStateOf(prefs.getBoolean(key, true)) }
+private fun PrefToggle(prefs: SharedPreferences, key: String, text: String, default: Boolean = true, onChange: (Boolean) -> Unit = {}) {
+    var on by remember { mutableStateOf(prefs.getBoolean(key, default)) }
     Toggle(text, on) {
         on = it
         prefs.edit().putBoolean(key, it).apply()
+        onChange(it)
     }
 }
 
 @Composable
 private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) {
     Page("Options", onMenu) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Sounds", color = Ink, fontWeight = FontWeight.Bold)
             IronSlider(audio.soundVolume, { audio.soundVolume = it; audio.save() }, onValueChangeFinished = { audio.play(audio.click) })
             Text("Music", color = Ink, fontWeight = FontWeight.Bold)
@@ -524,9 +641,11 @@ private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) 
             )
             if (audio.radioFailed) Text("Radio unavailable: back to the music loops.", color = Red, fontSize = 15.sp)
             Spacer(Modifier.height(8.dp))
-            PrefToggle(prefs, "confirmReset", "Ask twice before a reset")
             PrefToggle(prefs, "haptics", "Vibrate on every mark")
             PrefToggle(prefs, "keepScreenOn", "Keep the screen on while playing")
+            PrefToggle(prefs, "magnifier", "Magnifier under the finger on large grids") { Comfort.magnifier = it }
+            PrefToggle(prefs, "plainDigits", "Plain digits for the wall counts", Comfort.plainDigits) { Comfort.plainDigits = it }
+            PrefToggle(prefs, "calm", "Calm mode: nothing moves on its own", Comfort.calm) { Comfort.calm = it }
         }
     }
 }

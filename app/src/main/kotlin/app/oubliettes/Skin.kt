@@ -17,7 +17,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,10 +58,18 @@ private val DarkWood = Color(0xFF24170C)
 private val Iron = Color(0xFF3A3846)
 private val IronEdge = Color(0xFF8E8CAA)
 
-/** Frame counter of the sprite animations: one step every 150 ms. Read it while drawing. */
+/** Display settings, read while drawing. Loaded from the preferences on launch, changed in Options. */
+internal object Comfort {
+    /** Nothing moves on its own: no sprite animation, no flicker, no hopping. */
+    var calm by mutableStateOf(false)
+    var plainDigits by mutableStateOf(false)
+    var magnifier by mutableStateOf(true)
+}
+
+/** Frame counter of the sprite animations: one step every 150 ms, none in calm mode. Read it while drawing. */
 @Composable
-internal fun rememberTick(): State<Int> = produceState(0) {
-    while (true) {
+internal fun rememberTick(): State<Int> = produceState(0, Comfort.calm) {
+    while (!Comfort.calm) {
         delay(150)
         value++
     }

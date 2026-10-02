@@ -1,0 +1,8 @@
+- Fast drags no longer leave holes
+- Endless counts a grid the moment it is solved, once
+- Redo; undo history is saved; Reset can be undone
+- Rules on every grid; Continue on the menu; begun levels are marked
+- Tutorial you play yourself; magnifier on 12×12
+- Screen reader support, counts readable without colour, plain digits, calm mode
+- Campaign grids ship with the app; saves of 0.4 are kept
+- Music no longer plays over other apps

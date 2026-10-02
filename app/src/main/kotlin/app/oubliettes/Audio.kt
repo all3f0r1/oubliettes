@@ -3,6 +3,8 @@ package app.oubliettes
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.SoundPool
 import android.os.Handler
@@ -16,7 +18,11 @@ private const val RADIO_URL = "https://mediaserv73.live-streams.nl:18058/stream"
 
 private enum class Source { NONE, MENU, LOOP, RADIO }
 
-/** Sound effects plus background music: the bundled loops (a calmer one for the menus), or the Ancient FM stream when asked. */
+/**
+ * Sound effects plus background music: the bundled loops (a calmer one for the menus), or the Ancient FM stream when asked.
+ * The music holds the audio focus while it plays. It stays silent when another app is already
+ * playing, stops when another app takes the focus, and comes back when the focus does.
+ */
 class Audio(private val context: Context, private val prefs: SharedPreferences) {
     var soundVolume by mutableFloatStateOf(prefs.getFloat("soundVolume", 0.7f))
     var musicVolume by mutableFloatStateOf(prefs.getFloat("musicVolume", 0.5f))
@@ -38,6 +44,25 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     private var menu = true
     private var hushed = false
     private val handler = Handler(Looper.getMainLooper())
+
+    private val manager = context.getSystemService(AudioManager::class.java)
+    private var focused = false // the music may play
+    private var paused = false // focus lent for a moment (a call, a notification): it comes back by itself
+    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        .setAudioAttributes(attributes)
+        .setOnAudioFocusChangeListener({ change ->
+            when (change) {
+                AudioManager.AUDIOFOCUS_GAIN -> paused = false
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> paused = true
+                AudioManager.AUDIOFOCUS_LOSS -> {
+                    focused = false
+                    paused = false
+                }
+            }
+            // Not the moment to ask for the focus again: it was just taken.
+            sync(askFocus = false)
+        }, handler)
+        .build()
 
     fun play(sound: Int) {
         val v = soundVolume * soundVolume // squared: closer to perceived loudness
@@ -80,13 +105,24 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     }
 
     fun release() {
+        handler.removeCallbacksAndMessages(null)
+        manager.abandonAudioFocusRequest(focusRequest)
         player?.release()
         pool.release()
     }
 
-    private fun sync() {
+    private fun sync(askFocus: Boolean = true) {
+        val wanted = foreground && musicVolume > 0f
+        if (!wanted && focused) {
+            manager.abandonAudioFocusRequest(focusRequest)
+            focused = false
+            paused = false
+        } else if (wanted && !focused && askFocus && !manager.isMusicActive) {
+            // Another app playing keeps the floor: asking for the focus would stop it.
+            focused = manager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
         val want = when {
-            !foreground || musicVolume == 0f -> Source.NONE
+            !wanted || !focused || paused -> Source.NONE
             radio && !radioFailed -> Source.RADIO
             menu -> Source.MENU
             else -> Source.LOOP

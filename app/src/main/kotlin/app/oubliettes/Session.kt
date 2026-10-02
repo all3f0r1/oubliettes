@@ -1,0 +1,169 @@
+package app.oubliettes
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import app.oubliettes.game.Puzzle
+import app.oubliettes.game.drawing
+import app.oubliettes.game.isSolved
+import kotlin.math.abs
+
+// Mark values for a cell.
+internal const val WALL = 1
+internal const val KNOWN_OPEN = 2
+
+/** Actions kept for Undo. Older ones are forgotten. */
+private const val HISTORY = 50
+
+/**
+ * The marks of one grid being played, and their history. A stroke is one action: [begin], any number
+ * of [dragTo], then [end]. [saved] is what [save] returned earlier; it is ignored unless it was made
+ * for this exact puzzle. [legacyId] is what saves of 0.4 were tagged with instead: the seed.
+ */
+internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: String? = null) {
+    private val width = puzzle.width
+    private val cells = width * puzzle.height
+
+    /** Fingerprint of the clues: a save never lands on another grid, even if a seed gives a new one someday. */
+    private val id = puzzle.encode().hashCode().toString()
+
+    var marks by mutableStateOf(IntArray(cells))
+        private set
+    var solved by mutableStateOf(false)
+        private set
+    private val undone = mutableStateListOf<IntArray>()
+    private val redone = mutableStateListOf<IntArray>()
+    val canUndo get() = undone.isNotEmpty()
+    val canRedo get() = redone.isNotEmpty()
+
+    // The stroke in progress.
+    private var first = 0
+    private var value = 0
+    private var alongRow: Boolean? = null
+    private var last = 0
+    private var repaint = emptySet<Int>()
+
+    init {
+        fun snapshot(text: String) = text.takeIf { it.length == cells && it.all { c -> c in '0'..'2' } }
+            ?.let { IntArray(cells) { i -> text[i] - '0' } }
+        fun snapshots(text: String?) = text.orEmpty().split(',').mapNotNull(::snapshot)
+        val parts = saved.orEmpty().split(':')
+        if (parts[0] == id || parts[0] == legacyId) parts.getOrNull(1)?.let(::snapshot)?.let {
+            marks = it
+            undone += snapshots(parts.getOrNull(2))
+            redone += snapshots(parts.getOrNull(3))
+            settle()
+        }
+    }
+
+    fun save() = listOf(id, text(marks), undone.joinToString(",", transform = ::text), redone.joinToString(",", transform = ::text))
+        .joinToString(":")
+
+    private fun text(snapshot: IntArray) = snapshot.joinToString("")
+
+    private fun given(cell: Int) = cell in puzzle.monsters || cell in puzzle.chests
+
+    private fun walls() = BooleanArray(cells) { marks[it] == WALL }
+
+    /** The finished dungeon, as [drawing] gives it. */
+    fun picture() = drawing(puzzle, walls())
+
+    private fun settle() {
+        solved = isSolved(puzzle, walls())
+    }
+
+    /** Call before changing [marks]: the change becomes one action of the history. */
+    private fun record() {
+        undone += marks
+        if (undone.size > HISTORY) undone.removeAt(0)
+        redone.clear()
+    }
+
+    /**
+     * Starts a stroke: [cell] cycles through unknown, wall, known open, and the stroke will paint the
+     * value it got. False, and nothing happens, on a monster or a chest.
+     */
+    fun begin(cell: Int): Boolean {
+        if (given(cell)) return false
+        // The cells the previous action changed: this stroke may paint over those.
+        repaint = undone.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet()
+        record()
+        first = cell
+        value = (marks[cell] + 1) % 3
+        alongRow = null
+        marks = marks.copyOf().also { it[cell] = value }
+        return true
+    }
+
+    /**
+     * Moves the stroke to column [x], row [y], and returns how many cells that painted. The stroke
+     * locks onto the row or the column it first moves along (no zig-zag) and paints every cell it
+     * crosses on the way, however far the finger jumped: unknown cells and those of the previous
+     * action, never older marks.
+     */
+    fun dragTo(x: Int, y: Int): Int {
+        val firstX = first % width
+        val firstY = first / width
+        if (alongRow == null) {
+            if (x == firstX && y == firstY) return 0
+            alongRow = abs(x - firstX) >= abs(y - firstY)
+            last = if (alongRow == true) firstX else firstY
+        }
+        val row = alongRow == true
+        val to = if (row) x else y
+        val new = marks.copyOf()
+        var painted = 0
+        for (step in minOf(last, to)..maxOf(last, to)) {
+            val target = if (row) firstY * width + step else step * width + firstX
+            if (new[target] != value && (new[target] == 0 || target in repaint) && !given(target)) {
+                new[target] = value
+                painted++
+            }
+        }
+        last = to
+        if (painted > 0) marks = new
+        return painted
+    }
+
+    /** Ends the stroke: only now is the grid checked. True when this stroke solved it. */
+    fun end(): Boolean {
+        val before = solved
+        settle()
+        // A solved grid has nothing left to take back, and its history would only weigh on the saves.
+        if (solved) {
+            undone.clear()
+            redone.clear()
+        }
+        return solved && !before
+    }
+
+    /** Sets [targets] to [value] as one action. For the tutorial and the accessibility actions. */
+    fun paint(targets: Collection<Int>, value: Int): Boolean {
+        val new = marks.copyOf()
+        for (cell in targets) if (!given(cell)) new[cell] = value
+        if (new.contentEquals(marks)) return false
+        record()
+        marks = new
+        return end()
+    }
+
+    fun undo() {
+        if (!canUndo) return
+        redone += marks
+        marks = undone.removeAt(undone.lastIndex)
+        settle()
+    }
+
+    fun redo() {
+        if (!canRedo) return
+        undone += marks
+        marks = redone.removeAt(redone.lastIndex)
+        settle()
+    }
+
+    /** Empties the grid. An action like any other: Undo brings the marks back. */
+    fun reset() {
+        paint(marks.indices.toList(), 0)
+    }
+}

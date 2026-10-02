@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.5
+
+<p>
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.5/metadata/en-US/images/phoneScreenshots/2-game.png" width="200" alt="A grid in progress: underlined counts, the lit row and column, Undo, Redo, Reset and the Rules plank" />
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.5/metadata/en-US/images/phoneScreenshots/4-tutorial.png" width="200" alt="Tutorial step with two cells left to mark, and the Show me plank" />
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.5/metadata/en-US/images/phoneScreenshots/6-levels.png" width="200" alt="Campaign table: level 1 solved, level 2 begun" />
+</p>
+
+Saves, solved levels and settings of 0.4 are kept.
+
+### Fixed
+
+- A fast drag no longer leaves holes: every cell between two positions of the finger is filled,
+  including the one where it lifts.
+- Only the finger that started a drag draws. Other fingers landing on the grid are ignored.
+- Endless counts a grid the moment it is solved, and only once. It used to count on **Next grid**,
+  so a grid solved and then left was not counted.
+- Digging an Endless grid stops when you leave the screen or pick another size, instead of running
+  on in the background. It also gives up after 5000 tries and offers to dig another grid.
+- The status bar icons were dark on the dark inner screens. They are now light everywhere.
+- The music no longer plays over another app: it stays silent while another app is playing, stops
+  when one starts, and comes back afterwards.
+
+### Saves
+
+- The 150 campaign grids now ship with the app instead of being generated from seeds: no wait, and
+  they stay the same whatever becomes of the generator. They are the grids of 0.4.
+- Every save carries a fingerprint of its grid, and Endless saves the grid itself. A change of the
+  generator can no longer put old marks on a new grid.
+- Grids read from a save or from the campaign file are checked: sizes, counts, monsters and chests.
+
+### Playing
+
+- **Redo**, next to Undo. The history (50 actions) is saved with the marks: it is still there after
+  leaving the grid or the app.
+- **Reset** is an action like any other and can be undone. It no longer asks twice, and its option
+  is gone. On a solved grid it is called **Play again**.
+- **Rules** at the top of every grid shows the rules without leaving it, including the one about
+  walls never being more than two cells thick.
+- **Continue** on the main menu reopens the grid played last. The table of levels marks the levels
+  that are begun.
+- The tutorial is played: you mark the cells of each step yourself, and **Show me** does it for you.
+- The row and the column of the cell touched last are lit up to their counts.
+- On grids whose cells are smaller than a fingertip (12×12 on a phone), a magnifier shows what is
+  under the finger. It can be turned off.
+- A drag is one transaction: the grid is checked and saved when the finger lifts, not at every cell.
+
+### Accessibility and comfort
+
+- Every cell and every count is described to screen readers, with actions to mark the cells.
+- A count reached is underlined, a count exceeded is struck through: the colour is no longer the
+  only sign.
+- Option for plain digits on the wall counts.
+- Calm mode: monsters, chests and torches stop moving. On by default when the system animations are
+  off.
+- Every screen scrolls when it does not fit, on small screens or with large fonts. The tutorial text
+  no longer has a fixed height.
+
+### Under the hood
+
+- The marks, the drags and the history of a grid moved out of the screens into `Session`, with
+  their own tests.
+- CI runs Android Lint and publishes the test and Lint reports. Signing and publishing are a
+  separate job that only runs for tags.
+- The coroutines library is declared instead of being picked up from other dependencies.
+
 ## 0.4
 
 <p>

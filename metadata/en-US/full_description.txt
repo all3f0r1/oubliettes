@@ -13,9 +13,10 @@ Oubliettes is a logic puzzle. Each grid hides a dungeon: work out where every wa
 <ul>
 <li>Campaign: 150 levels that are the same for everyone, in three difficulties (8×8, 10×10, 12×12), all open from the start.</li>
 <li>Endless: randomly generated grids in the size you pick.</li>
-<li>Tutorial: a dungeon solved step by step, one rule at a time.</li>
-<li>Drag to fill a row or column, undo, progress saved after every move.</li>
-<li>Grids are generated on the device. No ads, no tracking, no account.</li>
+<li>Tutorial: a dungeon you solve step by step, one rule at a time.</li>
+<li>Drag to fill a row or column, undo and redo, progress and history saved after every move.</li>
+<li>Screen reader support, a magnifier for large grids, plain digits and a calm mode without animation.</li>
+<li>Endless grids are generated on the device. No ads, no tracking, no account.</li>
 <li>Original medieval music loops and sound effects, with volume sliders.</li>
 </ul>
 

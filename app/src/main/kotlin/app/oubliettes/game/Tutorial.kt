@@ -35,12 +35,14 @@ val tutorialSteps = listOf(
             "column holds. Monsters and chests are never walls.",
     ),
     TutorialStep(
-        "The last row and the last column ask for 6 walls in 6 cells: all of them are walls.",
+        "The last row and the last column ask for 6 walls in 6 cells: all of them are walls. " +
+            "Tap a cell to build a wall, or drag along the line to build them all.",
         walls = row(5, 0..5) + col(5, 0..4),
     ),
     TutorialStep(
         "Rows 3 and 5 ask for a single wall, and it is already placed on the right. Their other " +
-            "cells are therefore open: mark them with a dot.",
+            "cells are therefore open: tap them twice for a dot. A drag paints what its first cell " +
+            "becomes: tap one cell, then drag from it to lay dots.",
         open = row(2, 0..4) + row(4, 1..4),
     ),
     TutorialStep(

@@ -3,15 +3,23 @@ package app.oubliettes.game
 import kotlin.math.abs
 import kotlin.random.Random
 
-/** Deterministic: the same size and seed always give the same puzzle, which has exactly one solution. */
-fun generate(width: Int, height: Int, seed: Long): Puzzle {
+/** Layouts tried before [generate] gives up. Out of 1000 seeds per size, the slowest 12x12 needed 1856 (median 138). */
+const val MAX_TRIES = 5000
+
+/**
+ * Deterministic: the same size and seed always give the same puzzle, which has exactly one solution.
+ * Null when [cancelled] answered true between two tries, or when [maxTries] layouts were not enough.
+ */
+fun generate(width: Int, height: Int, seed: Long, maxTries: Int = MAX_TRIES, cancelled: () -> Boolean = { false }): Puzzle? {
     val rng = Random(seed xor (width.toLong() shl 32) xor (height.toLong() shl 48))
     // ponytail: rejection sampling, each try pays a full uniqueness search. Fine up to the sizes
     // offered in the UI; switch to constraint propagation in the solver if bigger grids are wanted.
-    while (true) {
-        val p = layout(width, height, rng) ?: continue
+    repeat(maxTries) {
+        if (cancelled()) return null
+        val p = layout(width, height, rng) ?: return@repeat
         if (solutions(p)?.size == 1) return p
     }
+    return null
 }
 
 /** Top-left cell of a 3x3 block made only of walls, or null when no wall is more than two cells thick. */

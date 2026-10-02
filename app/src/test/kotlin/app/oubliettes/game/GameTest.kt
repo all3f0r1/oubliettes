@@ -1,9 +1,11 @@
 package app.oubliettes.game
 
+import java.io.File
 import kotlin.random.Random
 import kotlin.system.measureTimeMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -135,7 +137,7 @@ class GameTest {
             val total = measureTimeMillis {
                 for (seed in 0L until seeds) {
                     val p: Puzzle
-                    slowest = maxOf(slowest, measureTimeMillis { p = generate(size, size, seed) })
+                    slowest = maxOf(slowest, measureTimeMillis { p = generate(size, size, seed)!! })
                     val found = solutions(p, maxNodes = Int.MAX_VALUE)!!
                     assertEquals(1, found.size)
                     assertEquals("walls at most two cells thick", null, thickWall(found[0], size, size))
@@ -150,8 +152,49 @@ class GameTest {
                     "${monsters.toDouble() / seeds} monsters, ${chests.toDouble() / seeds} chests, $walls% walls",
             )
         }
-        val a = generate(8, 8, 42)
-        val b = generate(8, 8, 42)
+        val a = generate(8, 8, 42)!!
+        val b = generate(8, 8, 42)!!
         assertTrue(a.rowCounts.contentEquals(b.rowCounts) && a.monsters == b.monsters && a.chests == b.chests)
+    }
+
+    @Test
+    fun generatorStopsWhenCancelledOrOutOfTries() {
+        var asked = 0
+        assertNull(generate(12, 12, 3) { ++asked == 3 })
+        assertEquals("checked before every try", 3, asked)
+        assertNull("no try, no puzzle", generate(8, 8, 42, maxTries = 0))
+        // A budget does not change what a seed gives.
+        assertEquals(generate(8, 8, 42)!!.encode(), generate(8, 8, 42, maxTries = Int.MAX_VALUE)!!.encode())
+    }
+
+    @Test
+    fun puzzleRoundTripsAndRejectsNonsense() {
+        val p = generate(10, 10, 7)!!
+        assertEquals(p.encode(), decodePuzzle(p.encode())!!.encode())
+        assertEquals("6x6|3,2,1,5,1,6|2,2,2,4,2,6|10,24|7", tutorialPuzzle.encode())
+        for (bad in listOf(
+            "", "garbage", "6x6|3,2,1,5,1,6|2,2,2,4,2,6|10,24", // not a puzzle, a part missing
+            "6x6|3,2,1,5,1|2,2,2,4,2,6|10,24|7", // a row count missing
+            "6x6|3,2,1,5,1,7|2,2,2,4,2,6|10,24|7", // more walls than cells
+            "6x6|3,2,1,5,1,6|2,2,2,4,2,6|10,36|7", // monster outside the grid
+            "6x6|3,2,1,5,1,6|2,2,2,4,2,6|10,7|7", // monster on the chest
+            "40x1|0|0|0|1", // wider than the solver can hold
+        )) assertNull(bad, decodePuzzle(bad))
+    }
+
+    /** The campaign is a file, not seeds: its grids must stay what they are. */
+    @Test
+    fun campaignIsFrozenAndSound() {
+        val lines = File("src/main/res/raw/campaign.txt").readLines()
+        assertEquals(150, lines.size)
+        assertEquals("the campaign changed: saves and solved levels of players would no longer match", -1974651446, lines.hashCode())
+        for ((index, line) in lines.withIndex()) {
+            val p = decodePuzzle(line)!!
+            assertEquals(listOf(8, 10, 12)[index / 50], p.width)
+            assertEquals(p.width, p.height)
+            assertEquals("level ${index + 1}", 1, solutions(p, maxNodes = Int.MAX_VALUE)!!.size)
+        }
+        // Level 1 of each size is still the grid 0.4 generated from seed 1.
+        for (index in listOf(0, 50, 100)) assertEquals(generate(8 + index / 25, 8 + index / 25, 1)!!.encode(), lines[index])
     }
 }

@@ -8,7 +8,30 @@ class Puzzle(
     val colCounts: IntArray,
     val monsters: Set<Int>,
     val chests: Set<Int>,
-)
+) {
+    init {
+        // The solver holds a row in the bits of an Int.
+        require(width in 1..30 && height >= 1) { "size ${width}x$height" }
+        require(rowCounts.size == height && rowCounts.all { it in 0..width }) { "row counts" }
+        require(colCounts.size == width && colCounts.all { it in 0..height }) { "column counts" }
+        require((monsters + chests).all { it in 0 until width * height }) { "given cell outside the grid" }
+        require(monsters.none { it in chests }) { "monster on a chest" }
+    }
+
+    /** The whole puzzle on one line, read back by [decodePuzzle]. Saves and the campaign file rely on it: keep it stable. */
+    fun encode() = listOf(
+        "${width}x$height", rowCounts.joinToString(","), colCounts.joinToString(","),
+        monsters.sorted().joinToString(","), chests.sorted().joinToString(","),
+    ).joinToString("|")
+}
+
+/** Null when [text] is not a puzzle written by [Puzzle.encode]. */
+fun decodePuzzle(text: String): Puzzle? = runCatching {
+    fun numbers(part: String) = part.split(',').filter { it.isNotEmpty() }.map { it.toInt() }
+    val parts = text.trim().split('|')
+    val (width, height) = parts[0].split('x').map { it.toInt() }
+    Puzzle(width, height, numbers(parts[1]).toIntArray(), numbers(parts[2]).toIntArray(), numbers(parts[3]).toSet(), numbers(parts[4]).toSet())
+}.getOrNull()
 
 /** The dungeon as one character per cell: '#' wall, '.' open, 'M' monster, 'C' chest. */
 fun drawing(p: Puzzle, walls: BooleanArray) = String(
