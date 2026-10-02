@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3x3 mini dungeon inside the 66dp adaptive-icon safe zone: walls in an L, a chest in the corner. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#2A2833" android:pathData="M24,24h60v60h-60z" />
+    <path android:fillColor="#6E6C88" android:pathData="M25,25h18v18h-18zM45,25h18v18h-18zM65,25h18v18h-18zM25,45h18v18h-18zM25,65h18v18h-18z" />
+    <path android:fillColor="#8E8CAA" android:pathData="M25,25h18v4h-18zM45,25h18v4h-18zM65,25h18v4h-18zM25,45h18v4h-18zM25,65h18v4h-18z" />
+    <path android:fillColor="#E0B84C" android:pathData="M67,69h14v12h-14z" />
+    <path android:fillColor="#8A5A2B" android:pathData="M67,73h14v2h-14zM73,72h2v4h-2z" />
+    <path android:fillColor="#E06C5A" android:pathData="M54,54m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+</vector>

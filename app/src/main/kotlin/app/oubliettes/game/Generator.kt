@@ -1,0 +1,109 @@
+package app.oubliettes.game
+
+import kotlin.math.abs
+import kotlin.random.Random
+
+/** Deterministic: the same size and seed always give the same puzzle, which has exactly one solution. */
+fun generate(width: Int, height: Int, seed: Long): Puzzle {
+    val rng = Random(seed xor (width.toLong() shl 32) xor (height.toLong() shl 48))
+    // ponytail: rejection sampling, each try pays a full uniqueness search. Fine up to the sizes
+    // offered in the UI; switch to constraint propagation in the solver if bigger grids are wanted.
+    while (true) {
+        val p = layout(width, height, rng) ?: continue
+        if (solutions(p)?.size == 1) return p
+    }
+}
+
+/** Carves one random dungeon and derives its clues. Null when the attempt broke a rule. */
+internal fun layout(w: Int, h: Int, rng: Random): Puzzle? {
+    val walls = BooleanArray(w * h) { true }
+    val frozen = BooleanArray(w * h) // room surroundings: stay walls, except each room's exit
+    val inRoom = BooleanArray(w * h)
+    val chests = mutableSetOf<Int>()
+
+    fun isOpen(x: Int, y: Int) = x in 0 until w && y in 0 until h && !walls[y * w + x]
+
+    val tops = mutableListOf<Pair<Int, Int>>()
+    val exits = mutableListOf<Int>()
+    repeat(rng.nextInt(w * h / 32 + 1)) {
+        val tx = rng.nextInt(w - 2)
+        val ty = rng.nextInt(h - 2)
+        // Keep the 5x5 footprints apart so two rooms never share surrounding cells.
+        if (tops.any { abs(it.first - tx) < 5 && abs(it.second - ty) < 5 }) return@repeat
+        tops += tx to ty
+        for (i in 0 until 9) {
+            val cell = (ty + i / 3) * w + tx + i % 3
+            walls[cell] = false
+            inRoom[cell] = true
+        }
+        chests += (ty + rng.nextInt(3)) * w + tx + rng.nextInt(3)
+        val around = (0 until 3).flatMap { listOf(tx + it to ty - 1, tx + it to ty + 3, tx - 1 to ty + it, tx + 3 to ty + it) }
+            .filter { (x, y) -> x in 0 until w && y in 0 until h }
+            .map { (x, y) -> y * w + x }
+        around.forEach { frozen[it] = true }
+        exits += around.random(rng).also { walls[it] = false }
+    }
+    val start = exits.firstOrNull() ?: rng.nextInt(w * h).also { walls[it] = false }
+
+    fun neighbours(i: Int) = listOf(i - 1, i + 1, i - w, i + w)
+        .filter { it in walls.indices && abs(it % w - i % w) + abs(it / w - i / w) == 1 }
+
+    /** Open cells connected to [start]. */
+    fun reached(): BooleanArray {
+        val seen = BooleanArray(w * h)
+        val stack = ArrayDeque(listOf(start))
+        seen[start] = true
+        while (stack.isNotEmpty()) {
+            for (n in neighbours(stack.removeLast())) if (!walls[n] && !seen[n]) {
+                seen[n] = true
+                stack.add(n)
+            }
+        }
+        return seen
+    }
+
+    fun canOpen(i: Int, seen: BooleanArray): Boolean {
+        if (!walls[i] || frozen[i] || neighbours(i).none { seen[it] }) return false
+        val x = i % w
+        val y = i / w
+        // Refuse to complete any of the four 2x2 blocks containing this cell.
+        for (dy in -1..0) for (dx in -1..0) {
+            if ((0 until 4).all { val bx = x + dx + it % 2; val by = y + dy + it / 2; (bx == x && by == y) || isOpen(bx, by) }) return false
+        }
+        return true
+    }
+
+    // Grow hallways from the start: mostly extend the last corridor (long hallways, few dead ends),
+    // sometimes branch elsewhere, and head for any room that is not connected yet.
+    var budget = (w * h * (0.35 + 0.2 * rng.nextDouble())).toInt()
+    var last = -1
+    while (true) {
+        val seen = reached()
+        val goal = exits.firstOrNull { !seen[it] }
+        if (goal == null && budget-- <= 0) break
+        val all = walls.indices.filter { canOpen(it, seen) }
+        if (all.isEmpty()) return null // boxed in: would be a degenerate, near-empty dungeon
+        val near = all.filter { last in neighbours(it) }
+        last = when {
+            goal != null && rng.nextBoolean() -> all.minBy { abs(it % w - goal % w) + abs(it / w - goal / w) }
+            near.isNotEmpty() && rng.nextInt(4) != 0 -> near.random(rng)
+            else -> all.random(rng)
+        }
+        walls[last] = false
+    }
+
+    val monsters = walls.indices.filter { i ->
+        val x = i % w
+        val y = i / w
+        !walls[i] && !inRoom[i] &&
+            listOf(isOpen(x - 1, y), isOpen(x + 1, y), isOpen(x, y - 1), isOpen(x, y + 1)).count { it } == 1
+    }.toSet()
+
+    val p = Puzzle(
+        w, h,
+        IntArray(h) { y -> (0 until w).count { walls[y * w + it] } },
+        IntArray(w) { x -> (0 until h).count { walls[it * w + x] } },
+        monsters, chests,
+    )
+    return p.takeIf { isSolved(it, walls) }
+}
