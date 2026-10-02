@@ -7,9 +7,15 @@ The loop is written to be easy on the ears over long sessions: slow 3/4 in D Dor
 strings with nothing above 5 kHz, a quiet recorder melody that rests for a third of the loop, no
 percussion, and 80 seconds before anything repeats. Note tails and reverb wrap around the end, so
 the loop point is seamless.
+
+The main menu has its own loop: shorter and calmer, the lute alone over the drone.
+
+Names given as arguments (music, menu, sfx_click, sfx_victory) limit what is written; the default is
+everything.
 """
 import pathlib
 import subprocess
+import sys
 import wave
 
 import numpy as np
@@ -115,6 +121,31 @@ def music():
     return stereo / np.abs(stereo).max() * 0.5
 
 
+def menu():
+    """Menu loop: 24 seconds, one slow lute note per beat over the drone, no melody."""
+    beat = 1.0
+    chords = [DM, DM, F, C, DM, AM, C, DM]
+    n = round(len(chords) * 3 * beat * SR)
+    own = np.random.default_rng(11)  # its own generator: adding this loop must not change the others
+    lute = np.zeros(n)
+    for bar, (bass, fifth, octave, third) in enumerate(chords):
+        notes = [(0, bass, 1.0), (1, fifth, 0.5), (2, third if bar % 2 else octave, 0.55)]
+        for at, note, vel in notes:
+            add(lute, (bar * 3 + at) * beat + own.normal(0, 0.006), pluck(note, dur=3.6, vel=vel * own.uniform(0.85, 1.0)))
+
+    t = np.arange(n) / SR
+    loop = n / SR
+    drone = sum(
+        amp * np.sin(2 * np.pi * round(hz(m) * loop) / loop * t)
+        for m, amp in ((38, 1.0), (45, 0.6))
+    ) * (0.8 + 0.2 * np.sin(2 * np.pi * 2 / loop * t))
+
+    dry = 0.5 * lute + 0.06 * drone
+    left = 0.65 * dry + 0.35 * reverb(dry, (1557, 1617, 1491, 1422))
+    right = 0.65 * dry + 0.35 * reverb(dry, (1580, 1640, 1514, 1445))
+    return np.stack([left, right], axis=1)
+
+
 def click():
     """Short and dry, pitched where phone speakers are at ease."""
     t = np.arange(int(0.03 * SR)) / SR
@@ -151,6 +182,7 @@ def save(name, signal, peak):
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
-    save("music", music(), 0.5)
-    save("sfx_click", click(), 0.4)
-    save("sfx_victory", victory(), 0.8)
+    sounds = {"music": (music, 0.5), "menu": (menu, 0.4), "sfx_click": (click, 0.4), "sfx_victory": (victory, 0.8)}
+    for name in sys.argv[1:] or sounds:
+        make, peak = sounds[name]
+        save(name, make(), peak)

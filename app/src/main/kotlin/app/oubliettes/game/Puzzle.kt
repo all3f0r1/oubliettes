@@ -10,6 +10,11 @@ class Puzzle(
     val chests: Set<Int>,
 )
 
+/** The dungeon as one character per cell: '#' wall, '.' open, 'M' monster, 'C' chest. */
+fun drawing(p: Puzzle, walls: BooleanArray) = String(
+    CharArray(walls.size) { if (walls[it]) '#' else if (it in p.monsters) 'M' else if (it in p.chests) 'C' else '.' },
+)
+
 /** True when [walls] satisfies every rule of [p]. */
 fun isSolved(p: Puzzle, walls: BooleanArray): Boolean {
     val w = p.width

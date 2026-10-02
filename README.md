@@ -7,7 +7,8 @@ A logic puzzle game for Android: work out where the dungeon walls are from the c
   <img src="metadata/en-US/images/phoneScreenshots/2-game.png" width="190" alt="An 8×8 grid in progress: walls, monsters, a chest and the wall counts" />
   <img src="metadata/en-US/images/phoneScreenshots/3-solved.png" width="190" alt="The same grid solved, all counts green" />
   <img src="metadata/en-US/images/phoneScreenshots/4-tutorial.png" width="190" alt="Tutorial step explaining that a monster sits in a dead end" />
-  <img src="metadata/en-US/images/phoneScreenshots/5-options.png" width="190" alt="Options: sound and music sliders, radio checkbox" />
+  <img src="metadata/en-US/images/phoneScreenshots/5-options.png" width="190" alt="Options: sound and music sliders, radio and comfort checkboxes" />
+  <img src="metadata/en-US/images/phoneScreenshots/6-levels.png" width="190" alt="Campaign: the table of levels, the solved one showing its dungeon" />
 </p>
 
 ## Rules
@@ -25,27 +26,34 @@ Every grid has exactly one solution. Generated grids also never have walls more 
 ## Controls
 
 - Tap a cell to cycle it: unknown, wall, known open.
-- Drag to fill a row or a column: the drag stays on the line it started along and only fills unknown
-  cells, so it never overwrites what you already marked.
-- **Undo** takes back the last action (a whole drag counts as one), **Clear** empties the grid.
+- Drag to fill a row or a column: the drag stays on the line it started along and fills unknown
+  cells, plus the cells of your previous action (drag again over a drag to fix it). Older marks are
+  never overwritten.
+- **Undo** takes back the last action (a whole drag counts as one). **Reset** empties the grid; it
+  asks twice, because it cannot be undone.
 - A count turns green when its row or column has the right number of walls, red when it has too many.
 
 ## Modes
 
-- **Campaign**: one sequence of levels with fixed seeds, so level *n* is the same grid for everyone.
-  Grids grow from 8×8 (levels 1–10) to 10×10 (11–25) and 12×12 (26 and up).
-- **Endless**: randomly generated grids in the size you pick.
+- **Campaign**: three difficulties, Easy (8×8), Medium (10×10) and Hard (12×12), with 50 levels each.
+  Seeds are fixed, so level *n* is the same grid for everyone. All levels are open from the start; the
+  table of levels shows a small picture of each dungeon you solved.
+- **Endless**: randomly generated grids in the size you pick. A new grid comes once the current one
+  is solved.
 - **Tutorial**: a small dungeon solved one deduction at a time, showing each rule at work.
 
-Progress on the current grid is saved after every move and restored on the next launch.
+Progress on every grid is saved after every move and restored on the next launch.
+
+Options can turn off the vibration on every mark, the second tap asked by Reset, and keeping the
+screen on while a grid is shown.
 
 ## Sound
 
-Options has volume sliders for sound effects and music. The music is a bundled 80-second medieval loop;
-a checkbox replaces it with the live stream of [Ancient FM](https://ancientfm.com/) (medieval and
+Options has volume sliders for sound effects and music. The music is a bundled 80-second medieval loop, with
+a shorter and calmer 24-second one for the menus; a checkbox replaces them with the live stream of [Ancient FM](https://ancientfm.com/) (medieval and
 Renaissance music, needs an Internet connection — the only thing the app uses the network for).
 
-The loop and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).
+The loops and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).
 
 ## Install
 
@@ -77,3 +85,6 @@ draft build recipe to submit to [fdroiddata](https://gitlab.com/fdroid/fdroiddat
 ## License
 
 [GPL-3.0-or-later](LICENSE). The music and sound effects are original and covered by the same license.
+
+The fonts, [UnifrakturCook](https://fonts.google.com/specimen/UnifrakturCook) and
+[Almendra](https://fonts.google.com/specimen/Almendra), are under the SIL Open Font License: see `LICENSES/`.

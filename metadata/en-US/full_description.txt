@@ -11,12 +11,12 @@ Oubliettes is a logic puzzle. Each grid hides a dungeon: work out where every wa
 
 <b>Features</b>
 <ul>
-<li>Campaign: a sequence of levels that is the same for everyone, growing from 8×8 to 12×12.</li>
+<li>Campaign: 150 levels that are the same for everyone, in three difficulties (8×8, 10×10, 12×12), all open from the start.</li>
 <li>Endless: randomly generated grids in the size you pick.</li>
 <li>Tutorial: a dungeon solved step by step, one rule at a time.</li>
 <li>Drag to fill a row or column, undo, progress saved after every move.</li>
 <li>Grids are generated on the device. No ads, no tracking, no account.</li>
-<li>Original medieval music loop and sound effects, with volume sliders.</li>
+<li>Original medieval music loops and sound effects, with volume sliders.</li>
 </ul>
 
 The music can optionally be replaced by the live stream of Ancient FM (ancientfm.com). This is off by default and is the only thing the app uses the network for.

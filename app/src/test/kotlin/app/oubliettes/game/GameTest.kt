@@ -48,6 +48,12 @@ class GameTest {
     }
 
     @Test
+    fun drawingRoundTrips() {
+        val (p, walls) = parse(*good)
+        assertEquals(good.joinToString(""), drawing(p, walls))
+    }
+
+    @Test
     fun tutorialStepsSolveItsPuzzle() {
         val walls = BooleanArray(tutorialSolution.size)
         val marked = tutorialPuzzle.monsters + tutorialPuzzle.chests + tutorialSteps.flatMap { step ->

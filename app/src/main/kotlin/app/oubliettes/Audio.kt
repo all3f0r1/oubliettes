@@ -14,9 +14,9 @@ import androidx.compose.runtime.setValue
 
 private const val RADIO_URL = "https://mediaserv73.live-streams.nl:18058/stream" // Ancient FM, ancientfm.com
 
-private enum class Source { NONE, LOOP, RADIO }
+private enum class Source { NONE, MENU, LOOP, RADIO }
 
-/** Sound effects plus background music: the bundled loop, or the Ancient FM stream when asked. */
+/** Sound effects plus background music: the bundled loops (a calmer one for the menus), or the Ancient FM stream when asked. */
 class Audio(private val context: Context, private val prefs: SharedPreferences) {
     var soundVolume by mutableFloatStateOf(prefs.getFloat("soundVolume", 0.7f))
     var musicVolume by mutableFloatStateOf(prefs.getFloat("musicVolume", 0.5f))
@@ -35,6 +35,7 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     private var player: MediaPlayer? = null
     private var source = Source.NONE
     private var foreground = false
+    private var menu = true
     private var hushed = false
     private val handler = Handler(Looper.getMainLooper())
 
@@ -72,6 +73,12 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
         sync()
     }
 
+    /** Menus get their own shorter, calmer loop. */
+    fun setMenu(value: Boolean) {
+        menu = value
+        sync()
+    }
+
     fun release() {
         player?.release()
         pool.release()
@@ -81,6 +88,7 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
         val want = when {
             !foreground || musicVolume == 0f -> Source.NONE
             radio && !radioFailed -> Source.RADIO
+            menu -> Source.MENU
             else -> Source.LOOP
         }
         if (want != source) {
@@ -88,7 +96,7 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
             source = want
             player = when (want) {
                 Source.NONE -> null
-                Source.LOOP -> MediaPlayer.create(context, R.raw.music, attributes, 0)?.apply {
+                Source.MENU, Source.LOOP -> MediaPlayer.create(context, if (want == Source.MENU) R.raw.menu else R.raw.music, attributes, 0)?.apply {
                     isLooping = true
                     start()
                 }

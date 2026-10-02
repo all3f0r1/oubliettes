@@ -1,0 +1,7 @@
+- Campaign: three difficulties (8×8, 10×10, 12×12), 50 levels each, all open, with a picture of every dungeon you solved
+- A drag can paint over the cells of the previous action, to fix it in one move
+- Skip is gone; Clear is now Reset, asks twice and cannot be undone
+- Medieval look everywhere: wooden buttons, iron sliders, blackletter and calligraphic fonts
+- Animated torches, chests and more menacing monsters that blink and look around
+- A shorter, calmer music loop for the menus
+- Vibration on every mark, screen kept on while playing (both can be turned off)

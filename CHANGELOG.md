@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.4
+
+<p>
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.4/metadata/en-US/images/phoneScreenshots/1-menu.png" width="200" alt="Main menu in blackletter, with wooden planks and the monsters watching" />
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.4/metadata/en-US/images/phoneScreenshots/6-levels.png" width="200" alt="Campaign table: three difficulties, 50 numbered slabs, the solved level showing its dungeon" />
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.4/metadata/en-US/images/phoneScreenshots/2-game.png" width="200" alt="A grid in progress with the Undo, Reset and Next level planks" />
+</p>
+
+### Campaign
+
+- Three difficulties: Easy (8×8), Medium (10×10) and Hard (12×12), 50 levels each, all open from the
+  start.
+- The campaign opens on a table of numbered levels. A solved level shows a small picture of its
+  finished dungeon.
+- Every level keeps its own marks, so you can leave one and come back to it.
+- Easy 1–10 and Medium 11–25 are the grids of levels 1–25 of 0.3. Campaign progress of 0.3 is not
+  carried over: with Skip, a level reached was not a level solved.
+
+### Playing
+
+- A drag can now paint over the cells changed by the previous action, on top of unknown cells: drag
+  again over a drag to turn it into dots, or back to unknown. Older marks are still never overwritten.
+- **Skip** is gone. The right-hand button moves on once the grid is solved. In Endless, the only
+  ways out of a grid are to solve it or to pick another size.
+- **Clear** is now **Reset**: greyed while the grid is empty, and it cannot be undone. It asks for a
+  second tap (“Sure?”) first. A solved grid can be reset to play it again.
+- Every mark gives a light vibration, and the screen stays on while a grid is shown.
+- Options has checkboxes to turn off the second tap of Reset, the vibration and the screen staying on.
+
+### Look
+
+- Titles are set in blackletter (UnifrakturCook) and everything else in a calligraphic hand
+  (Almendra), wall counts included. Both fonts are bundled, under the SIL Open Font License.
+- Every button is a riveted wooden plank; sliders are iron bars filling with gold; checkboxes are
+  iron plates crossed in gold; a torch burns while a grid is being dug.
+- Torches, chests and monsters are animated frame by frame, all the time. Monsters were redrawn to
+  look meaner (fangs, frowns, slit pupils); they blink and glance left and right.
+
+### Sound
+
+- The menus, Options and the table of levels have their own music loop: 24 seconds, lute alone,
+  slower and calmer than the 80-second loop of the grids.
+
 ## 0.3
 
 <p>
