@@ -15,6 +15,20 @@ android {
         versionName = "0.1"
     }
     buildFeatures { compose = true }
+
+    // Release is signed only when -PkeystorePassword (or ORG_GRADLE_PROJECT_keystorePassword) is set.
+    val keystorePassword = providers.gradleProperty("keystorePassword").orNull?.takeIf { it.isNotEmpty() }
+    if (keystorePassword != null) {
+        signingConfigs.create("release") {
+            storeFile = rootProject.file("release.jks")
+            storePassword = keystorePassword
+            keyAlias = "oubliettes"
+            keyPassword = keystorePassword
+        }
+    }
+    buildTypes {
+        release { signingConfig = signingConfigs.findByName("release") }
+    }
 }
 
 dependencies {
