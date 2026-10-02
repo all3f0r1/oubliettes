@@ -3,8 +3,9 @@
 # metadata/io.github.all3f0r1.oubliettes.yml there and open a merge request.
 # Descriptions, screenshots and per-version changelogs are picked up from metadata/ in this repo.
 Categories:
-  - Games
+  - Puzzle Game
 License: GPL-3.0-or-later
+AuthorName: Alexandre Tournai
 SourceCode: https://github.com/all3f0r1/oubliettes
 IssueTracker: https://github.com/all3f0r1/oubliettes/issues
 Changelog: https://github.com/all3f0r1/oubliettes/blob/HEAD/CHANGELOG.md
@@ -13,28 +14,17 @@ AutoName: Oubliettes
 
 RepoType: git
 Repo: https://github.com/all3f0r1/oubliettes.git
+Binaries: https://github.com/all3f0r1/oubliettes/releases/download/%v/oubliettes-%v.apk
 
 Builds:
-  - versionName: '0.3'
-    versionCode: 3
-    commit: '0.3'
-    subdir: app
-    gradle:
-      - yes
-
-  - versionName: '0.4'
-    versionCode: 4
-    commit: '0.4'
-    subdir: app
-    gradle:
-      - yes
-
   - versionName: '0.5'
     versionCode: 5
-    commit: '0.5'
+    commit: 3f0ba022e40fb64a770c5d8786d8a0a7278cc10a
     subdir: app
     gradle:
       - yes
+
+AllowedAPKSigningKeys: 0091bd59aefaeff4a4f75fb25ecd2866ea80c812036ba39288fa5abb7feedb68
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
