@@ -48,6 +48,19 @@ class GameTest {
     }
 
     @Test
+    fun tutorialStepsSolveItsPuzzle() {
+        val walls = BooleanArray(tutorialSolution.size)
+        val marked = tutorialPuzzle.monsters + tutorialPuzzle.chests + tutorialSteps.flatMap { step ->
+            assertTrue(step.walls.all { tutorialSolution[it] } && step.open.none { tutorialSolution[it] })
+            step.walls.forEach { walls[it] = true }
+            step.walls + step.open
+        }
+        assertEquals("every cell is explained exactly once", walls.indices.toList(), marked.sorted())
+        assertTrue(isSolved(tutorialPuzzle, walls))
+        assertEquals(1, solutions(tutorialPuzzle, maxNodes = Int.MAX_VALUE)!!.size)
+    }
+
+    @Test
     fun solverMatchesBruteForce() {
         val rng = Random(1)
         val w = 5

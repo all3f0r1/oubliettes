@@ -1,0 +1,103 @@
+package app.oubliettes
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.SoundPool
+import android.os.Handler
+import android.os.Looper
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
+private const val RADIO_URL = "https://mediaserv73.live-streams.nl:18058/stream" // Ancient FM, ancientfm.com
+
+private enum class Source { NONE, LOOP, RADIO }
+
+/** Sound effects plus background music: the bundled loop, or the Ancient FM stream when asked. */
+class Audio(private val context: Context, private val prefs: SharedPreferences) {
+    var soundVolume by mutableFloatStateOf(prefs.getFloat("soundVolume", 0.7f))
+    var musicVolume by mutableFloatStateOf(prefs.getFloat("musicVolume", 0.5f))
+    var radio by mutableStateOf(prefs.getBoolean("radio", false))
+    var radioFailed by mutableStateOf(false)
+        private set
+
+    private val attributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_GAME)
+        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+        .build()
+    private val pool = SoundPool.Builder().setMaxStreams(4).setAudioAttributes(attributes).build()
+    val wall = pool.load(context, R.raw.sfx_wall, 1)
+    val mark = pool.load(context, R.raw.sfx_mark, 1)
+    val solved = pool.load(context, R.raw.sfx_solved, 1)
+
+    private var player: MediaPlayer? = null
+    private var source = Source.NONE
+    private var foreground = false
+    private val handler = Handler(Looper.getMainLooper())
+
+    fun play(sound: Int) {
+        val v = soundVolume * soundVolume // squared: closer to perceived loudness
+        if (v > 0) pool.play(sound, v, v, 1, 0, 1f)
+    }
+
+    /** Persists the settings and applies them to the music. Call after changing any of them. */
+    fun save(retryRadio: Boolean = false) {
+        prefs.edit().putFloat("soundVolume", soundVolume).putFloat("musicVolume", musicVolume)
+            .putBoolean("radio", radio).apply()
+        if (retryRadio) radioFailed = false
+        sync()
+    }
+
+    /** Music only plays while the app is on screen. */
+    fun setForeground(value: Boolean) {
+        foreground = value
+        if (value) radioFailed = false // the network may be back
+        sync()
+    }
+
+    fun release() {
+        player?.release()
+        pool.release()
+    }
+
+    private fun sync() {
+        val want = when {
+            !foreground || musicVolume == 0f -> Source.NONE
+            radio && !radioFailed -> Source.RADIO
+            else -> Source.LOOP
+        }
+        if (want != source) {
+            player?.release()
+            source = want
+            player = when (want) {
+                Source.NONE -> null
+                Source.LOOP -> MediaPlayer.create(context, R.raw.music, attributes, 0)?.apply {
+                    isLooping = true
+                    start()
+                }
+                Source.RADIO -> MediaPlayer().apply {
+                    setAudioAttributes(attributes)
+                    setDataSource(RADIO_URL)
+                    var connected = false
+                    setOnPreparedListener { connected = true; it.start() }
+                    // A live stream only ends or errors when the connection is lost: fall back to the loop.
+                    setOnCompletionListener { radioLost() }
+                    setOnErrorListener { _, _, _ -> radioLost(); true }
+                    prepareAsync()
+                    // Offline, the connection attempt can hang for minutes: give up well before that.
+                    handler.postDelayed({ if (player === this && !connected) radioLost() }, 15_000)
+                }
+            }
+        }
+        val v = musicVolume * musicVolume
+        player?.setVolume(v, v)
+    }
+
+    private fun radioLost() {
+        radioFailed = true
+        sync()
+    }
+}

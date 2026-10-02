@@ -10,6 +10,8 @@ fun generate(width: Int, height: Int, seed: Long): Puzzle {
     // offered in the UI; switch to constraint propagation in the solver if bigger grids are wanted.
     while (true) {
         val p = layout(width, height, rng) ?: continue
+        // Several fully walled rows or columns mean a dungeon squeezed into one corner: dull to solve.
+        if (p.rowCounts.count { it == width } + p.colCounts.count { it == height } > 1) continue
         if (solutions(p)?.size == 1) return p
     }
 }

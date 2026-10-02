@@ -1,26 +1,44 @@
 package app.oubliettes
 
 import android.content.SharedPreferences
+import android.media.AudioManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.systemGestureExclusion
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -28,197 +46,338 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.oubliettes.game.Puzzle
 import app.oubliettes.game.generate
 import app.oubliettes.game.isSolved
+import app.oubliettes.game.tutorialPuzzle
+import app.oubliettes.game.tutorialSteps
+import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val Bg = Color(0xFF1B1A22)
-private val Floor = Color(0xFF2A2833)
-private val Ink = Color(0xFFE8E6F0)
-private val Dim = Color(0xFF77758A)
-private val Gold = Color(0xFFE0B84C)
-private val Red = Color(0xFFE06C5A)
-
 private val SIZES = listOf(8, 10, 12)
 
-// Mark values for a cell.
-private const val WALL = 1
-private const val KNOWN_OPEN = 2
+private enum class Screen { MENU, CAMPAIGN, ENDLESS, TUTORIAL, OPTIONS }
+
+/** Campaign grids grow with the level; level n is always the same grid (its seed is n). */
+private fun campaignSize(level: Int) = if (level <= 10) 8 else if (level <= 25) 10 else 12
 
 class MainActivity : ComponentActivity() {
+    private lateinit var audio: Audio
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        volumeControlStream = AudioManager.STREAM_MUSIC
         val prefs = getPreferences(MODE_PRIVATE)
+        audio = Audio(applicationContext, prefs)
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(primary = Gold, onPrimary = Bg, background = Bg, surface = Bg, onSurface = Ink),
             ) {
-                Surface(Modifier.fillMaxSize()) { Game(prefs) }
+                Surface(Modifier.fillMaxSize()) { App(prefs, audio) }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        audio.setForeground(true)
+    }
+
+    override fun onStop() {
+        audio.setForeground(false)
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        audio.release()
+        super.onDestroy()
+    }
+}
+
+@Composable
+private fun App(prefs: SharedPreferences, audio: Audio) {
+    var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
+    val toMenu = { screen = Screen.MENU }
+    BackHandler(enabled = screen != Screen.MENU, onBack = toMenu)
+    when (screen) {
+        Screen.MENU -> Menu(prefs.getInt("level", 1)) { screen = it }
+        Screen.CAMPAIGN -> Game(prefs, audio, endless = false, toMenu)
+        Screen.ENDLESS -> Game(prefs, audio, endless = true, toMenu)
+        Screen.TUTORIAL -> Tutorial(toMenu) { screen = Screen.CAMPAIGN }
+        Screen.OPTIONS -> Options(audio, toMenu)
+    }
+}
+
+@Composable
+private fun Menu(level: Int, open: (Screen) -> Unit) {
+    val wall = painterResource(R.drawable.wall)
+    val torch = painterResource(R.drawable.torch)
+    val flicker by rememberInfiniteTransition(label = "torch").animateFloat(
+        0.7f, 1f, infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse), label = "flicker",
+    )
+    Box(
+        Modifier.fillMaxSize().drawBehind {
+            // A dungeon wall in the dark: staggered stone blocks, lit by two flickering torches.
+            val block = size.width / 5
+            val shade = ColorFilter.tint(Color(0xFF4A475C), BlendMode.Modulate)
+            for (rowIndex in 0..(size.height / block).toInt()) {
+                for (column in -1..5) {
+                    translate(column * block + if (rowIndex % 2 == 0) 0f else block / 2, rowIndex * block) {
+                        with(wall) { draw(Size(block, block), colorFilter = shade) }
+                    }
+                }
+            }
+            val torchSize = size.width * 0.16f
+            for (x in listOf(size.width * 0.14f, size.width * 0.86f)) {
+                val flame = Offset(x, size.height * 0.13f)
+                drawCircle(
+                    Brush.radialGradient(listOf(Color(0xFFF08A2A).copy(alpha = 0.5f * flicker), Color.Transparent), flame, size.width * 0.6f),
+                    size.width * 0.6f, flame,
+                )
+                translate(x - torchSize / 2, flame.y - torchSize * 0.25f) { with(torch) { draw(Size(torchSize, torchSize)) } }
+            }
+            drawRect(Brush.verticalGradient(listOf(Color.Transparent, Bg), startY = size.height * 0.45f))
+        },
+    ) {
+        Column(
+            Modifier.safeDrawingPadding().fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "OUBLIETTES",
+                color = Gold,
+                style = TextStyle(
+                    fontFamily = FontFamily.Serif, fontSize = 38.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp,
+                    shadow = Shadow(Color.Black, Offset(0f, 6f), 10f),
+                ),
+            )
+            Text("Retrouvez les murs du donjon", color = Ink, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic)
+            Spacer(Modifier.height(12.dp))
+            Plank("Campagne", "Niveau $level") { open(Screen.CAMPAIGN) }
+            Plank("Sans fin", "Grilles aléatoires") { open(Screen.ENDLESS) }
+            Plank("Tutoriel", "Une résolution pas à pas") { open(Screen.TUTORIAL) }
+            Plank("Options", "Sons, musique, radio") { open(Screen.OPTIONS) }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (id in listOf(R.drawable.monster_skull, R.drawable.monster_imp, R.drawable.chest, R.drawable.monster_slime, R.drawable.monster_bat)) {
+                    Image(painterResource(id), null, Modifier.size(40.dp))
+                }
             }
         }
     }
 }
 
+/** Menu button: a wooden plank with iron rivets. */
 @Composable
-private fun Game(prefs: SharedPreferences) {
-    var size by remember { mutableIntStateOf(prefs.getInt("size", SIZES[0])) }
-    var level by remember { mutableIntStateOf(prefs.getInt("level$size", 1)) }
+private fun Plank(title: String, detail: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(6.dp)
+    Column(
+        Modifier
+            .widthIn(max = 320.dp)
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF8A5C34), Color(0xFF5A391D))))
+            .border(3.dp, Color(0xFF24170C), shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .drawBehind {
+                val inset = 12.dp.toPx()
+                for (x in listOf(inset, size.width - inset)) for (y in listOf(inset, size.height - inset)) {
+                    drawCircle(Color(0xFF24170C), 4.dp.toPx(), Offset(x, y))
+                    drawCircle(Color(0xFFB9B4C8), 2.dp.toPx(), Offset(x - 1, y - 1))
+                }
+            }
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(title, color = Color(0xFFFFE9A8), fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 21.sp, letterSpacing = 2.sp)
+        Text(detail, color = Color(0xFFE6D3B0), fontFamily = FontFamily.Serif, fontSize = 13.sp)
+    }
+}
+
+/** Shared frame of the inner screens: a way back, a title, then the content. */
+@Composable
+private fun Page(title: String, onMenu: () -> Unit, content: @Composable () -> Unit) {
+    Column(
+        Modifier.safeDrawingPadding().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            OutlinedButton(onClick = onMenu, Modifier.align(Alignment.CenterStart)) { Text("Menu") }
+            Text(title, color = Gold, fontFamily = FontFamily.Serif, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        }
+        content()
+    }
+}
+
+private fun endlessSeed(prefs: SharedPreferences, size: Int) =
+    if (prefs.contains("seed$size")) prefs.getLong("seed$size", 0) else Random.nextLong()
+
+@Composable
+private fun Game(prefs: SharedPreferences, audio: Audio, endless: Boolean, onMenu: () -> Unit) {
+    var level by remember { mutableIntStateOf(prefs.getInt("level", 1)) }
+    var endlessSize by remember { mutableIntStateOf(prefs.getInt("endlessSize", SIZES[0])) }
+    var endlessSeed by remember(endlessSize) { mutableLongStateOf(endlessSeed(prefs, endlessSize)) }
     var solvedCount by remember { mutableIntStateOf(prefs.getInt("solved", 0)) }
     var puzzle by remember { mutableStateOf<Puzzle?>(null) }
     var marks by remember { mutableStateOf(IntArray(0)) }
 
-    LaunchedEffect(size, level) {
+    val size = if (endless) endlessSize else campaignSize(level)
+    val seed = if (endless) endlessSeed else level.toLong()
+    val marksKey = if (endless) "marksE$size" else "marksC"
+
+    LaunchedEffect(size, seed) {
         puzzle = null
-        val generated = withContext(Dispatchers.Default) { generate(size, size, level.toLong()) }
+        val generated = withContext(Dispatchers.Default) { generate(size, size, seed) }
         // Saved marks are only reused when they belong to this exact grid.
-        val saved = prefs.getString("marks", "")!!.removePrefix("$size:$level:")
+        // "marks" is the single key used by 0.1, formatted "size:level:marks".
+        val stored = prefs.getString(marksKey, null)
+            ?: if (endless) "" else prefs.getString("marks", "")!!.removePrefix("$size:")
+        val saved = stored.removePrefix("$seed:")
         marks = if (saved.length == size * size && saved.all { it in '0'..'2' }) {
             IntArray(saved.length) { saved[it] - '0' }
         } else {
             IntArray(size * size)
         }
         puzzle = generated
-        prefs.edit().putInt("size", size).putInt("level$size", level).apply()
+        prefs.edit().apply {
+            if (endless) putInt("endlessSize", size).putLong("seed$size", seed) else putInt("level", level)
+        }.apply()
     }
 
     fun update(new: IntArray) {
         marks = new
-        prefs.edit().putString("marks", "$size:$level:${new.joinToString("")}").apply()
+        prefs.edit().putString(marksKey, "$seed:${new.joinToString("")}").apply()
     }
 
     val p = puzzle
     val solved = p != null && isSolved(p, BooleanArray(marks.size) { marks[it] == WALL })
 
-    Column(
-        Modifier.safeDrawingPadding().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("OUBLIETTES", color = Gold, fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = 6.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (s in SIZES) {
-                if (s == size) {
-                    Button(onClick = {}) { Text("$s×$s") }
-                } else {
-                    OutlinedButton(onClick = { size = s; level = prefs.getInt("level$s", 1) }) { Text("$s×$s") }
+    Page(if (endless) "Sans fin" else "Campagne", onMenu) {
+        if (endless) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (s in SIZES) {
+                    if (s == size) {
+                        Button(onClick = {}) { Text("$s×$s") }
+                    } else {
+                        OutlinedButton(onClick = { endlessSize = s }) { Text("$s×$s") }
+                    }
                 }
             }
         }
-        Text("Grille n° $level · $solvedCount résolues", color = Dim)
+        Text(if (endless) "$solvedCount résolues" else "Niveau $level · $size×$size", color = Dim)
         if (p == null) {
             Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
-            Board(p, marks, locked = solved) { cell, value -> update(marks.copyOf().also { it[cell] = value }) }
+            Board(p, marks, locked = solved, variety = seed.toInt()) { cell, value ->
+                val new = marks.copyOf().also { it[cell] = value }
+                update(new)
+                audio.play(
+                    when {
+                        isSolved(p, BooleanArray(new.size) { new[it] == WALL }) -> audio.solved
+                        value == WALL -> audio.wall
+                        else -> audio.mark
+                    },
+                )
+            }
             Text(if (solved) "Donjon résolu !" else "", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { update(IntArray(size * size)) }, enabled = !solved) { Text("Effacer") }
                 Button(onClick = {
-                    if (solved) {
+                    if (solved && endless) {
                         solvedCount++
                         prefs.edit().putInt("solved", solvedCount).apply()
                     }
-                    level++
+                    if (endless) endlessSeed = Random.nextLong() else level++
                 }) { Text(if (solved) "Grille suivante" else "Passer") }
             }
         }
     }
 }
 
-/** Tap cycles a cell: unknown, wall, known open. Dragging paints the value set by the first cell. */
+/** Replays a fixed solve one deduction at a time. */
 @Composable
-private fun Board(p: Puzzle, marks: IntArray, locked: Boolean, onPaint: (cell: Int, value: Int) -> Unit) {
-    val wall = painterResource(R.drawable.wall)
-    val chest = painterResource(R.drawable.chest)
-    val monsters = listOf(
-        painterResource(R.drawable.monster_slime),
-        painterResource(R.drawable.monster_ghost),
-        painterResource(R.drawable.monster_imp),
-    )
-    val measurer = rememberTextMeasurer()
-    val currentMarks by rememberUpdatedState(marks)
-    val currentPaint by rememberUpdatedState(onPaint)
-    val columns = p.width + 1 // one extra row and column for the wall counts
+private fun Tutorial(onMenu: () -> Unit, onPlay: () -> Unit) {
+    var index by rememberSaveable { mutableIntStateOf(0) }
+    val step = tutorialSteps[index]
+    val p = tutorialPuzzle
+    val marks = IntArray(p.width * p.height)
+    for (done in tutorialSteps.take(index + 1)) {
+        done.walls.forEach { marks[it] = WALL }
+        done.open.forEach { marks[it] = KNOWN_OPEN }
+    }
+    val last = index == tutorialSteps.lastIndex
 
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(columns.toFloat() / (p.height + 1))
-            .pointerInput(p, locked) {
-                if (locked) return@pointerInput
-                val cell = size.width.toFloat() / columns
-                fun cellAt(o: Offset): Int? {
-                    if (o.x < cell || o.y < cell) return null
-                    val x = (o.x / cell).toInt() - 1
-                    val y = (o.y / cell).toInt() - 1
-                    val i = y * p.width + x
-                    return i.takeIf { x < p.width && y < p.height && i !in p.monsters && i !in p.chests }
-                }
-                awaitEachGesture {
-                    val first = cellAt(awaitFirstDown().position) ?: return@awaitEachGesture
-                    val value = (currentMarks[first] + 1) % 3
-                    currentPaint(first, value)
-                    do {
-                        val event = awaitPointerEvent()
-                        for (change in event.changes) {
-                            if (change.pressed) {
-                                cellAt(change.position)?.let { if (currentMarks[it] != value) currentPaint(it, value) }
-                            }
-                            change.consume()
-                        }
-                    } while (event.changes.any { it.pressed })
-                }
-            },
-    ) {
-        val cell = size.width / columns
-        val style = TextStyle(fontSize = (cell * 0.45f).toSp(), fontWeight = FontWeight.Bold)
+    Page("Tutoriel", onMenu) {
+        Text("Étape ${index + 1} / ${tutorialSteps.size}", color = Dim)
+        Board(p, marks, locked = true, focus = step.focus)
+        Text(step.text, Modifier.fillMaxWidth().height(150.dp), color = Ink, fontSize = 16.sp, lineHeight = 22.sp, textAlign = TextAlign.Center)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { index-- }, enabled = index > 0) { Text("Précédent") }
+            Button(onClick = { if (last) onPlay() else index++ }) { Text(if (last) "Jouer" else "Suivant") }
+        }
+    }
+}
 
-        fun count(want: Int, have: Int, centerX: Float, centerY: Float) {
-            val text = measurer.measure(want.toString(), style)
-            val color = if (have == want) Dim else if (have > want) Red else Ink
-            drawText(text, color, Offset(centerX - text.size.width / 2f, centerY - text.size.height / 2f))
-        }
-        for (x in 0 until p.width) {
-            count(p.colCounts[x], (0 until p.height).count { marks[it * p.width + x] == WALL }, (x + 1.5f) * cell, cell / 2)
-        }
-        for (y in 0 until p.height) {
-            count(p.rowCounts[y], (0 until p.width).count { marks[y * p.width + it] == WALL }, cell / 2, (y + 1.5f) * cell)
-        }
-
-        for (i in marks.indices) {
-            val left = (i % p.width + 1) * cell
-            val top = (i / p.width + 1) * cell
-            drawRect(Floor, Offset(left + 1, top + 1), Size(cell - 2, cell - 2))
-            val painter = when {
-                marks[i] == WALL -> wall
-                i in p.chests -> chest
-                i in p.monsters -> monsters[i % monsters.size]
-                else -> null
+@Composable
+private fun Options(audio: Audio, onMenu: () -> Unit) {
+    Page("Options", onMenu) {
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Sons", color = Ink, fontWeight = FontWeight.Bold)
+            // Sliders reach the screen edge: keep the system back gesture from stealing their drags.
+            Slider(
+                modifier = Modifier.systemGestureExclusion(),
+                value = audio.soundVolume,
+                onValueChange = { audio.soundVolume = it; audio.save() },
+                onValueChangeFinished = { audio.play(audio.wall) },
+            )
+            Text("Musique", color = Ink, fontWeight = FontWeight.Bold)
+            Slider(value = audio.musicVolume, onValueChange = { audio.musicVolume = it; audio.save() }, modifier = Modifier.systemGestureExclusion())
+            Row(
+                Modifier.fillMaxWidth().toggleable(audio.radio, role = Role.Checkbox) { audio.radio = it; audio.save(retryRadio = true) }.padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = audio.radio, onCheckedChange = null)
+                Text("Remplacer la boucle musicale par la radio", color = Ink)
             }
-            if (painter != null) translate(left, top) { with(painter) { draw(Size(cell, cell)) } }
-            if (marks[i] == KNOWN_OPEN) drawCircle(Dim, cell * 0.1f, Offset(left + cell / 2, top + cell / 2))
+            Text(
+                "Ancient FM (ancientfm.com) : musique médiévale et de la Renaissance, en direct. " +
+                    "Nécessite une connexion Internet.",
+                color = Dim, fontSize = 13.sp,
+            )
+            if (audio.radioFailed) Text("Radio indisponible : retour à la boucle musicale.", color = Red, fontSize = 13.sp)
         }
     }
 }

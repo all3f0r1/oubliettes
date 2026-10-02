@@ -33,6 +33,8 @@ jobs:
       - if: github.ref_type == 'tag'
         run: |
           cp app/build/outputs/apk/release/app-release.apk "oubliettes-$GITHUB_REF_NAME.apk"
-          gh release create "$GITHUB_REF_NAME" "oubliettes-$GITHUB_REF_NAME.apk" --generate-notes
+          # Release notes are this version's section of the changelog.
+          awk -v heading="## $GITHUB_REF_NAME" '$0 == heading { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" "oubliettes-$GITHUB_REF_NAME.apk" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}
