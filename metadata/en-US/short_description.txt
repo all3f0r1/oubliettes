@@ -1,0 +1,1 @@
+Dungeon logic puzzle: find the walls from the row and column counts

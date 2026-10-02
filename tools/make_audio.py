@@ -115,22 +115,20 @@ def music():
     return stereo / np.abs(stereo).max() * 0.5
 
 
-def wall():
-    t = np.arange(int(0.14 * SR)) / SR
-    noise = np.convolve(rng.normal(size=len(t)), np.ones(40) / 40, mode="same")
-    return 4 * noise * np.exp(-t * 40) + 0.6 * np.sin(2 * np.pi * 95 * t) * np.exp(-t * 30)
+def click():
+    """Short and dry, pitched where phone speakers are at ease."""
+    t = np.arange(int(0.03 * SR)) / SR
+    return np.sin(2 * np.pi * 1400 * t) * np.exp(-t * 220) * np.minimum(1, t / 0.0005)
 
 
-def mark():
-    t = np.arange(int(0.08 * SR)) / SR
-    return np.sin(2 * np.pi * 660 * t) * np.exp(-t * 60) * np.minimum(1, t / 0.002)
-
-
-def solved():
-    out = np.zeros(int(2.2 * SR))
-    for i, note in enumerate((62, 69, 74, 77, 81)):
-        sig = pluck(note, dur=1.6)
-        out[int(i * 0.13 * SR):][:len(sig)] += sig
+def victory():
+    """Rising D major arpeggio, then the full chord strummed."""
+    out = np.zeros(int(3.4 * SR))
+    notes = [(i * 0.12, note) for i, note in enumerate((62, 66, 69, 74, 78, 81))]
+    notes += [(1.0 + i * 0.025, note) for i, note in enumerate((50, 62, 69, 74, 78, 86))]
+    for at, note in notes:
+        sig = pluck(note, dur=2.1)
+        out[int(at * SR):][:len(sig)] += sig
     return out
 
 
@@ -154,6 +152,5 @@ def save(name, signal, peak):
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     save("music", music(), 0.5)
-    save("sfx_wall", wall(), 0.8)
-    save("sfx_mark", mark(), 0.5)
-    save("sfx_solved", solved(), 0.7)
+    save("sfx_click", click(), 0.4)
+    save("sfx_victory", victory(), 0.8)

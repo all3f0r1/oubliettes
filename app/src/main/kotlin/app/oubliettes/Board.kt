@@ -1,5 +1,10 @@
 package app.oubliettes
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -13,6 +18,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
@@ -21,6 +27,9 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import app.oubliettes.game.Puzzle
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sin
 
 internal val Bg = Color(0xFF1B1A22)
 internal val Ink = Color(0xFFF2F0FA)
@@ -36,16 +45,23 @@ internal const val WALL = 1
 internal const val KNOWN_OPEN = 2
 
 /**
- * Tap cycles a cell: unknown, wall, known open. Dragging paints the value set by the first cell.
- * [variety] picks which monsters and wall tiles a grid shows; [focus] cells get a gold outline.
+ * Tap cycles a cell: unknown, wall, known open. Dragging paints the value set by the first cell, along
+ * its row or column, into unknown cells only. [onStroke] is called once before each gesture's first
+ * change. [variety] picks which monsters and wall tiles a grid shows; [focus] cells get a gold outline.
+ * [celebrate] shows the finished dungeon: no dots, monsters and chest moving.
  */
 @Composable
 internal fun Board(
     p: Puzzle,
     marks: IntArray,
     locked: Boolean,
+    celebrate: Boolean = false,
     variety: Int = 0,
     focus: List<Int> = emptyList(),
+    onStroke: () -> Unit = {},
+    // Marks as of right now. [marks] is only as fresh as the last recomposition, which is too old
+    // for a second tap landing before the next frame.
+    liveMarks: () -> IntArray = { marks },
     onPaint: (cell: Int, value: Int) -> Unit = { _, _ -> },
 ) {
     // Mostly plain bricks, so the odd cracked or mossy one reads as detail rather than noise.
@@ -62,8 +78,15 @@ internal fun Board(
     )
     val monsterOrder = p.monsters.sorted() // neighbouring monsters get different faces
     val measurer = rememberTextMeasurer()
-    val currentMarks by rememberUpdatedState(marks)
+    val currentMarks by rememberUpdatedState(liveMarks)
     val currentPaint by rememberUpdatedState(onPaint)
+    val currentStroke by rememberUpdatedState(onStroke)
+    val beat = if (celebrate) {
+        rememberInfiniteTransition(label = "celebrate")
+            .animateFloat(0f, 1f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "beat")
+    } else {
+        null
+    }
     val columns = p.width + 1 // one extra row and column for the wall counts
 
     Canvas(
@@ -82,13 +105,29 @@ internal fun Board(
                 }
                 awaitEachGesture {
                     val first = cellAt(awaitFirstDown().position) ?: return@awaitEachGesture
-                    val value = (currentMarks[first] + 1) % 3
+                    val firstX = first % p.width
+                    val firstY = first / p.width
+                    val value = (currentMarks()[first] + 1) % 3
+                    currentStroke()
                     currentPaint(first, value)
+                    // The drag locks onto the row or the column it first moves along: no zig-zag.
+                    var alongRow: Boolean? = null
                     do {
                         val event = awaitPointerEvent()
                         for (change in event.changes) {
                             if (change.pressed) {
-                                cellAt(change.position)?.let { if (currentMarks[it] != value) currentPaint(it, value) }
+                                val x = ((change.position.x / cell).toInt() - 1).coerceIn(0, p.width - 1)
+                                val y = ((change.position.y / cell).toInt() - 1).coerceIn(0, p.height - 1)
+                                if (alongRow == null && (x != firstX || y != firstY)) alongRow = abs(x - firstX) >= abs(y - firstY)
+                                val target = when (alongRow) {
+                                    true -> firstY * p.width + x
+                                    false -> y * p.width + firstX
+                                    null -> first
+                                }
+                                // Only unknown cells: a drag never overwrites what is already marked.
+                                if (value != 0 && currentMarks()[target] == 0 && target !in p.monsters && target !in p.chests) {
+                                    currentPaint(target, value)
+                                }
                             }
                             change.consume()
                         }
@@ -116,11 +155,12 @@ internal fun Board(
             count(p.rowCounts[y], (0 until p.width).count { marks[y * p.width + it] == WALL }, cell / 2, (y + 1.5f) * cell)
         }
 
+        val t = beat?.value ?: 0f
         for (i in marks.indices) {
             val left = (i % p.width + 1) * cell
             val top = (i / p.width + 1) * cell
             val given = i in p.chests || i in p.monsters
-            val floor = if (given || marks[i] == KNOWN_OPEN) OpenFloor else Unknown
+            val floor = if (given || marks[i] == KNOWN_OPEN || (celebrate && marks[i] != WALL)) OpenFloor else Unknown
             drawRect(floor, Offset(left + 1, top + 1), Size(cell - 2, cell - 2))
             val painter = when {
                 marks[i] == WALL -> walls[(i * 5 + variety).mod(walls.size)]
@@ -128,8 +168,16 @@ internal fun Board(
                 i in p.monsters -> monsters[(monsterOrder.indexOf(i) + variety).mod(monsters.size)]
                 else -> null
             }
-            if (painter != null) translate(left, top) { with(painter) { draw(Size(cell, cell)) } }
-            if (marks[i] == KNOWN_OPEN) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))
+            // Celebration: monsters hop one after the other, chests pulse.
+            val moving = celebrate && marks[i] != WALL
+            val hop = if (moving && i in p.monsters) abs(sin(PI.toFloat() * (t + monsterOrder.indexOf(i) * 0.37f))) * cell * 0.16f else 0f
+            val pulse = if (moving && i in p.chests) 1f + 0.1f * sin(2 * PI.toFloat() * t) else 1f
+            if (painter != null) {
+                translate(left, top - hop) {
+                    scale(pulse, Offset(cell / 2, cell / 2)) { with(painter) { draw(Size(cell, cell)) } }
+                }
+            }
+            if (marks[i] == KNOWN_OPEN && !celebrate) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))
         }
         for (i in focus) {
             val inset = cell * 0.06f

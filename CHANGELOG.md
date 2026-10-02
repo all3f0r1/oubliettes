@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.3
+
+<p>
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.3/metadata/en-US/images/phoneScreenshots/2-game.png" width="200" alt="A grid in progress, with the new Undo button" />
+  <img src="https://raw.githubusercontent.com/all3f0r1/oubliettes/0.3/metadata/en-US/images/phoneScreenshots/3-solved.png" width="200" alt="A solved dungeon: no dots left, monsters hopping" />
+</p>
+
+**The application ID is now `io.github.all3f0r1.oubliettes`** (was `app.oubliettes`), an identifier under
+a domain the project controls, as F-Droid asks. Android sees it as a different app: 0.3 installs next to
+0.2 instead of updating it, and starts with fresh progress. Uninstall 0.2 by hand.
+
+### Quality of life
+
+- Dragging now stays on the row or the column it started along (no zig-zag), and only fills unknown
+  cells: it can no longer overwrite cells that are already marked.
+- New **Undo** button: takes back the last action, a whole drag counting as one. Clearing the
+  grid can be undone too. The history is kept while the grid stays on screen.
+- Fixed: two quick taps on the same cell could count as a single one.
+- When a dungeon is solved, the open-cell dots disappear, the whole floor lights up, monsters hop and
+  the chest pulses.
+
+### Language
+
+- The interface is now in English (it was in French).
+
+### Sound
+
+- A single short, subtle click for every cell change replaces the wall and mark sounds of 0.2 (the wall
+  thud was too low to be heard on phone speakers).
+- New victory jingle when a grid is completed; the music goes silent while it plays.
+
+### Grids
+
+- Walls are never more than two cells thick: the generator keeps digging until no 3×3 block of walls
+  is left. This also replaces the 0.2 filter on fully walled rows and columns. Grids differ from 0.2
+  for the same level number (level 1 happens to be unchanged).
+- 12×12 grids take longer to generate than before (about three times, measured on a desktop JVM).
+
+### F-Droid preparation
+
+- GPL-3.0-or-later license added.
+- Store listing in `metadata/` (description, icon, feature graphic, screenshots,
+  per-version changelogs) and a draft build recipe in `fdroid/`.
+- The APK no longer embeds the encrypted dependency list that F-Droid rejects.
+
 ## 0.2
 
 <p>

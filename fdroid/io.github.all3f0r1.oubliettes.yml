@@ -1,0 +1,28 @@
+# Draft build recipe for the official F-Droid repository. It does not belong to this repo's build:
+# to submit, fork https://gitlab.com/fdroid/fdroiddata, copy this file (without this comment) to
+# metadata/io.github.all3f0r1.oubliettes.yml there and open a merge request.
+# Descriptions, screenshots and per-version changelogs are picked up from metadata/ in this repo.
+Categories:
+  - Games
+License: GPL-3.0-or-later
+SourceCode: https://github.com/all3f0r1/oubliettes
+IssueTracker: https://github.com/all3f0r1/oubliettes/issues
+Changelog: https://github.com/all3f0r1/oubliettes/blob/HEAD/CHANGELOG.md
+
+AutoName: Oubliettes
+
+RepoType: git
+Repo: https://github.com/all3f0r1/oubliettes.git
+
+Builds:
+  - versionName: '0.3'
+    versionCode: 3
+    commit: '0.3'
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '0.3'
+CurrentVersionCode: 3

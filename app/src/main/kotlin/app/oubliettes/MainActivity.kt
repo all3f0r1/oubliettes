@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -180,12 +181,12 @@ private fun Menu(level: Int, open: (Screen) -> Unit) {
                     shadow = Shadow(Color.Black, Offset(0f, 6f), 10f),
                 ),
             )
-            Text("Retrouvez les murs du donjon", color = Ink, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic)
+            Text("Find the dungeon walls", color = Ink, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic)
             Spacer(Modifier.height(12.dp))
-            Plank("Campagne", "Niveau $level") { open(Screen.CAMPAIGN) }
-            Plank("Sans fin", "Grilles aléatoires") { open(Screen.ENDLESS) }
-            Plank("Tutoriel", "Une résolution pas à pas") { open(Screen.TUTORIAL) }
-            Plank("Options", "Sons, musique, radio") { open(Screen.OPTIONS) }
+            Plank("Campaign", "Level $level") { open(Screen.CAMPAIGN) }
+            Plank("Endless", "Random grids") { open(Screen.ENDLESS) }
+            Plank("Tutorial", "A step-by-step solve") { open(Screen.TUTORIAL) }
+            Plank("Options", "Sounds, music, radio") { open(Screen.OPTIONS) }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (id in listOf(R.drawable.monster_skull, R.drawable.monster_imp, R.drawable.chest, R.drawable.monster_slime, R.drawable.monster_bat)) {
@@ -254,15 +255,14 @@ private fun Game(prefs: SharedPreferences, audio: Audio, endless: Boolean, onMen
     val size = if (endless) endlessSize else campaignSize(level)
     val seed = if (endless) endlessSeed else level.toLong()
     val marksKey = if (endless) "marksE$size" else "marksC"
+    // ponytail: undo history lives in memory only, it is gone after leaving the grid or the app.
+    val history = remember(size, seed) { mutableStateListOf<IntArray>() }
 
     LaunchedEffect(size, seed) {
         puzzle = null
         val generated = withContext(Dispatchers.Default) { generate(size, size, seed) }
         // Saved marks are only reused when they belong to this exact grid.
-        // "marks" is the single key used by 0.1, formatted "size:level:marks".
-        val stored = prefs.getString(marksKey, null)
-            ?: if (endless) "" else prefs.getString("marks", "")!!.removePrefix("$size:")
-        val saved = stored.removePrefix("$seed:")
+        val saved = prefs.getString(marksKey, "")!!.removePrefix("$seed:")
         marks = if (saved.length == size * size && saved.all { it in '0'..'2' }) {
             IntArray(saved.length) { saved[it] - '0' }
         } else {
@@ -282,7 +282,7 @@ private fun Game(prefs: SharedPreferences, audio: Audio, endless: Boolean, onMen
     val p = puzzle
     val solved = p != null && isSolved(p, BooleanArray(marks.size) { marks[it] == WALL })
 
-    Page(if (endless) "Sans fin" else "Campagne", onMenu) {
+    Page(if (endless) "Endless" else "Campaign", onMenu) {
         if (endless) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (s in SIZES) {
@@ -294,33 +294,31 @@ private fun Game(prefs: SharedPreferences, audio: Audio, endless: Boolean, onMen
                 }
             }
         }
-        Text(if (endless) "$solvedCount résolues" else "Niveau $level · $size×$size", color = Dim)
+        Text(if (endless) "$solvedCount solved" else "Level $level · $size×$size", color = Dim)
         if (p == null) {
             Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
-            Board(p, marks, locked = solved, variety = seed.toInt()) { cell, value ->
+            Board(p, marks, locked = solved, celebrate = solved, variety = seed.toInt(), onStroke = { history += marks }, liveMarks = { marks }) { cell, value ->
                 val new = marks.copyOf().also { it[cell] = value }
                 update(new)
-                audio.play(
-                    when {
-                        isSolved(p, BooleanArray(new.size) { new[it] == WALL }) -> audio.solved
-                        value == WALL -> audio.wall
-                        else -> audio.mark
-                    },
-                )
+                if (isSolved(p, BooleanArray(new.size) { new[it] == WALL })) audio.victory() else audio.play(audio.click)
             }
-            Text(if (solved) "Donjon résolu !" else "", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(if (solved) "Dungeon solved!" else "", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { update(IntArray(size * size)) }, enabled = !solved) { Text("Effacer") }
+                OutlinedButton(
+                    onClick = { update(history.removeAt(history.lastIndex)); audio.play(audio.click) },
+                    enabled = history.isNotEmpty() && !solved,
+                ) { Text("Undo") }
+                OutlinedButton(onClick = { history += marks; update(IntArray(size * size)) }, enabled = !solved) { Text("Clear") }
                 Button(onClick = {
                     if (solved && endless) {
                         solvedCount++
                         prefs.edit().putInt("solved", solvedCount).apply()
                     }
                     if (endless) endlessSeed = Random.nextLong() else level++
-                }) { Text(if (solved) "Grille suivante" else "Passer") }
+                }) { Text(if (solved) "Next grid" else "Skip") }
             }
         }
     }
@@ -339,13 +337,13 @@ private fun Tutorial(onMenu: () -> Unit, onPlay: () -> Unit) {
     }
     val last = index == tutorialSteps.lastIndex
 
-    Page("Tutoriel", onMenu) {
-        Text("Étape ${index + 1} / ${tutorialSteps.size}", color = Dim)
-        Board(p, marks, locked = true, focus = step.focus)
+    Page("Tutorial", onMenu) {
+        Text("Step ${index + 1} / ${tutorialSteps.size}", color = Dim)
+        Board(p, marks, locked = true, celebrate = last, focus = step.focus)
         Text(step.text, Modifier.fillMaxWidth().height(150.dp), color = Ink, fontSize = 16.sp, lineHeight = 22.sp, textAlign = TextAlign.Center)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { index-- }, enabled = index > 0) { Text("Précédent") }
-            Button(onClick = { if (last) onPlay() else index++ }) { Text(if (last) "Jouer" else "Suivant") }
+            OutlinedButton(onClick = { index-- }, enabled = index > 0) { Text("Back") }
+            Button(onClick = { if (last) onPlay() else index++ }) { Text(if (last) "Play" else "Next") }
         }
     }
 }
@@ -354,15 +352,15 @@ private fun Tutorial(onMenu: () -> Unit, onPlay: () -> Unit) {
 private fun Options(audio: Audio, onMenu: () -> Unit) {
     Page("Options", onMenu) {
         Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Sons", color = Ink, fontWeight = FontWeight.Bold)
+            Text("Sounds", color = Ink, fontWeight = FontWeight.Bold)
             // Sliders reach the screen edge: keep the system back gesture from stealing their drags.
             Slider(
                 modifier = Modifier.systemGestureExclusion(),
                 value = audio.soundVolume,
                 onValueChange = { audio.soundVolume = it; audio.save() },
-                onValueChangeFinished = { audio.play(audio.wall) },
+                onValueChangeFinished = { audio.play(audio.click) },
             )
-            Text("Musique", color = Ink, fontWeight = FontWeight.Bold)
+            Text("Music", color = Ink, fontWeight = FontWeight.Bold)
             Slider(value = audio.musicVolume, onValueChange = { audio.musicVolume = it; audio.save() }, modifier = Modifier.systemGestureExclusion())
             Row(
                 Modifier.fillMaxWidth().toggleable(audio.radio, role = Role.Checkbox) { audio.radio = it; audio.save(retryRadio = true) }.padding(vertical = 12.dp),
@@ -370,14 +368,14 @@ private fun Options(audio: Audio, onMenu: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(checked = audio.radio, onCheckedChange = null)
-                Text("Remplacer la boucle musicale par la radio", color = Ink)
+                Text("Replace music loop by radio", color = Ink)
             }
             Text(
-                "Ancient FM (ancientfm.com) : musique médiévale et de la Renaissance, en direct. " +
-                    "Nécessite une connexion Internet.",
+                "Ancient FM (ancientfm.com): live medieval and Renaissance music. " +
+                    "Needs an Internet connection.",
                 color = Dim, fontSize = 13.sp,
             )
-            if (audio.radioFailed) Text("Radio indisponible : retour à la boucle musicale.", color = Red, fontSize = 13.sp)
+            if (audio.radioFailed) Text("Radio unavailable: back to the music loop.", color = Red, fontSize = 13.sp)
         }
     }
 }

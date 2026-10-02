@@ -31,42 +31,42 @@ private fun col(x: Int, ys: IntRange) = ys.map { c(x, it) }
 
 val tutorialSteps = listOf(
     TutorialStep(
-        "Le but : retrouver tous les murs du donjon. Chaque nombre indique combien de murs contient " +
-            "sa ligne ou sa colonne. Les monstres et les coffres ne sont jamais des murs.",
+        "The goal: find every wall of the dungeon. Each number tells how many walls its row or " +
+            "column holds. Monsters and chests are never walls.",
     ),
     TutorialStep(
-        "La dernière ligne et la dernière colonne demandent 6 murs pour 6 cases : tout y est mur.",
+        "The last row and the last column ask for 6 walls in 6 cells: all of them are walls.",
         walls = row(5, 0..5) + col(5, 0..4),
     ),
     TutorialStep(
-        "Les lignes 3 et 5 ne demandent qu'un mur, et il est déjà posé à droite. Leurs autres cases " +
-            "sont donc libres : on les marque d'un point.",
+        "Rows 3 and 5 ask for a single wall, and it is already placed on the right. Their other " +
+            "cells are therefore open: mark them with a dot.",
         open = row(2, 0..4) + row(4, 1..4),
     ),
     TutorialStep(
-        "Un monstre vit au fond d'un cul-de-sac : il n'a qu'une seule case libre autour de lui. " +
-            "Celui-ci en a déjà une en dessous, ses autres voisins sont donc des murs.",
+        "A monster lives at the end of a dead end: it has exactly one open cell next to it. " +
+            "This one already has one below, so its other neighbours are walls.",
         walls = listOf(c(4, 0), c(3, 1)),
         focus = listOf(c(4, 1), c(4, 0), c(3, 1), c(4, 2)),
     ),
     TutorialStep(
-        "La colonne 5 a ses 2 murs : sa dernière case inconnue est libre. La ligne 4 demande alors " +
-            "5 murs et il ne lui reste que 5 cases possibles : toutes sont des murs.",
+        "Column 5 has its 2 walls: its last unknown cell is open. Row 4 then asks for 5 walls " +
+            "and has only 5 possible cells left: all of them are walls.",
         walls = row(3, 0..3),
         open = listOf(c(4, 3)),
     ),
     TutorialStep(
-        "La colonne 4 demande 4 murs. Elle en a 3 et une seule case inconnue : c'est le quatrième.",
+        "Column 4 asks for 4 walls. It has 3 and a single unknown cell: that is the fourth.",
         walls = listOf(c(3, 0)),
     ),
     TutorialStep(
-        "Les lignes 1 et 2 ont maintenant tous leurs murs : ce qui reste est libre.",
+        "Rows 1 and 2 now have all their walls: what is left is open.",
         open = row(0, 0..2) + listOf(c(0, 1), c(2, 1)),
     ),
     TutorialStep(
-        "Le coffre est dans une salle au trésor : 3×3 cases libres, un seul coffre (n'importe où dans " +
-            "la salle) et une seule sortie. Partout ailleurs les couloirs font une case de large, sans " +
-            "bloc libre de 2×2, et tout le donjon est relié. Donjon résolu !",
+        "The chest is in a treasure room: 3×3 open cells, a single chest (anywhere in the room) " +
+            "and a single exit. Everywhere else hallways are one cell wide, with no open 2×2 block, " +
+            "and the whole dungeon is connected. Dungeon solved!",
         focus = (0..2).flatMap { row(it, 0..2) },
     ),
 )

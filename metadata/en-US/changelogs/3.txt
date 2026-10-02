@@ -1,0 +1,7 @@
+- Dragging stays on one row or column and only fills unknown cells
+- Undo button
+- Solved dungeons drop their dots; monsters and chest come alive
+- New click and victory sounds; the music pauses for the victory jingle
+- Walls in generated grids are never more than two cells thick
+- Interface now in English
+- New application ID: io.github.all3f0r1.oubliettes

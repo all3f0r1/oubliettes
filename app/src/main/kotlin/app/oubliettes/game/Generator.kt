@@ -10,10 +10,13 @@ fun generate(width: Int, height: Int, seed: Long): Puzzle {
     // offered in the UI; switch to constraint propagation in the solver if bigger grids are wanted.
     while (true) {
         val p = layout(width, height, rng) ?: continue
-        // Several fully walled rows or columns mean a dungeon squeezed into one corner: dull to solve.
-        if (p.rowCounts.count { it == width } + p.colCounts.count { it == height } > 1) continue
         if (solutions(p)?.size == 1) return p
     }
+}
+
+/** Top-left cell of a 3x3 block made only of walls, or null when no wall is more than two cells thick. */
+internal fun thickWall(walls: BooleanArray, w: Int, h: Int): Int? = walls.indices.firstOrNull { i ->
+    i % w + 3 <= w && i / w + 3 <= h && (0 until 9).all { walls[i + it / 3 * w + it % 3] }
 }
 
 /** Carves one random dungeon and derives its clues. Null when the attempt broke a rule. */
@@ -76,17 +79,20 @@ internal fun layout(w: Int, h: Int, rng: Random): Puzzle? {
     }
 
     // Grow hallways from the start: mostly extend the last corridor (long hallways, few dead ends),
-    // sometimes branch elsewhere, and head for any room that is not connected yet.
+    // sometimes branch elsewhere, and head for any room that is not connected yet. Once the budget
+    // is spent, keep digging only towards walls more than two cells thick, until none is left.
     var budget = (w * h * (0.35 + 0.2 * rng.nextDouble())).toInt()
     var last = -1
     while (true) {
         val seen = reached()
         val goal = exits.firstOrNull { !seen[it] }
-        if (goal == null && budget-- <= 0) break
+        var thick: Int? = null
+        if (goal == null && budget-- <= 0) thick = (thickWall(walls, w, h) ?: break) + w + 1 // its centre
         val all = walls.indices.filter { canOpen(it, seen) }
         if (all.isEmpty()) return null // boxed in: would be a degenerate, near-empty dungeon
         val near = all.filter { last in neighbours(it) }
         last = when {
+            thick != null -> all.minBy { abs(it % w - thick % w) + abs(it / w - thick / w) }
             goal != null && rng.nextBoolean() -> all.minBy { abs(it % w - goal % w) + abs(it / w - goal / w) }
             near.isNotEmpty() && rng.nextInt(4) != 0 -> near.random(rng)
             else -> all.random(rng)

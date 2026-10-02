@@ -1,0 +1,22 @@
+Oubliettes is a logic puzzle. Each grid hides a dungeon: work out where every wall is from the clues, with no guessing needed. Every grid has exactly one solution.
+
+<b>Rules</b>
+<ul>
+<li>The numbers along the edge give the number of walls in each row and column.</li>
+<li>Monsters and chests are never walls.</li>
+<li>Every monster sits in a dead end, and every dead end holds a monster.</li>
+<li>Every chest is in a treasure room: 3×3 open cells, one chest, one opening.</li>
+<li>Elsewhere, hallways are one cell wide and the whole dungeon is connected.</li>
+</ul>
+
+<b>Features</b>
+<ul>
+<li>Campaign: a sequence of levels that is the same for everyone, growing from 8×8 to 12×12.</li>
+<li>Endless: randomly generated grids in the size you pick.</li>
+<li>Tutorial: a dungeon solved step by step, one rule at a time.</li>
+<li>Drag to fill a row or column, undo, progress saved after every move.</li>
+<li>Grids are generated on the device. No ads, no tracking, no account.</li>
+<li>Original medieval music loop and sound effects, with volume sliders.</li>
+</ul>
+
+The music can optionally be replaced by the live stream of Ancient FM (ancientfm.com). This is off by default and is the only thing the app uses the network for.

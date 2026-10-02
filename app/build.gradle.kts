@@ -8,13 +8,18 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.oubliettes"
+        applicationId = "io.github.all3f0r1.oubliettes"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
     buildFeatures { compose = true }
+    // F-Droid rejects the encrypted dependency list AGP embeds for Google Play.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
 
     // Release is signed only when -PkeystorePassword (or ORG_GRADLE_PROJECT_keystorePassword) is set.
     val keystorePassword = providers.gradleProperty("keystorePassword").orNull?.takeIf { it.isNotEmpty() }

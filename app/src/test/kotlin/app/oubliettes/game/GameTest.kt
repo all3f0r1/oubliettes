@@ -130,7 +130,9 @@ class GameTest {
                 for (seed in 0L until seeds) {
                     val p: Puzzle
                     slowest = maxOf(slowest, measureTimeMillis { p = generate(size, size, seed) })
-                    assertEquals(1, solutions(p, maxNodes = Int.MAX_VALUE)!!.size)
+                    val found = solutions(p, maxNodes = Int.MAX_VALUE)!!
+                    assertEquals(1, found.size)
+                    assertEquals("walls at most two cells thick", null, thickWall(found[0], size, size))
                     monsters += p.monsters.size
                     chests += p.chests.size
                     wallCells += p.rowCounts.sum()

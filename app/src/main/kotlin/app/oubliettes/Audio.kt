@@ -29,18 +29,32 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
         .build()
     private val pool = SoundPool.Builder().setMaxStreams(4).setAudioAttributes(attributes).build()
-    val wall = pool.load(context, R.raw.sfx_wall, 1)
-    val mark = pool.load(context, R.raw.sfx_mark, 1)
-    val solved = pool.load(context, R.raw.sfx_solved, 1)
+    val click = pool.load(context, R.raw.sfx_click, 1)
+    private val victory = pool.load(context, R.raw.sfx_victory, 1)
 
     private var player: MediaPlayer? = null
     private var source = Source.NONE
     private var foreground = false
+    private var hushed = false
     private val handler = Handler(Looper.getMainLooper())
 
     fun play(sound: Int) {
         val v = soundVolume * soundVolume // squared: closer to perceived loudness
         if (v > 0) pool.play(sound, v, v, 1, 0, 1f)
+    }
+
+    /** Plays the victory jingle, with the music silenced while it lasts. */
+    fun victory() {
+        play(victory)
+        hushed = true
+        sync()
+        handler.removeCallbacks(unhush)
+        handler.postDelayed(unhush, 3500)
+    }
+
+    private val unhush = Runnable {
+        hushed = false
+        sync()
     }
 
     /** Persists the settings and applies them to the music. Call after changing any of them. */
@@ -92,7 +106,7 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
                 }
             }
         }
-        val v = musicVolume * musicVolume
+        val v = if (hushed) 0f else musicVolume * musicVolume
         player?.setVolume(v, v)
     }
 
