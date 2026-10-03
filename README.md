@@ -20,7 +20,8 @@ A logic puzzle game for Android: work out where the dungeon walls are from the c
 - Outside treasure rooms, hallways are one cell wide (no open 2×2 block).
 - All open cells are connected.
 
-Every grid has exactly one solution. Generated grids also never have walls more than two cells thick
+Every grid has exactly one solution. Newly generated grids (Endless, and the Baby and Leeroy levels) can
+be solved without a guess: at most by trying a cell both ways and seeing one break a rule. Generated grids also never have walls more than two cells thick
 (no 3×3 block of walls), which you can use as a clue.
 
 ## Controls
@@ -34,28 +35,33 @@ Every grid has exactly one solution. Generated grids also never have walls more 
   never overwritten. However fast the finger goes, every cell it crosses is filled, and only the
   finger that started a drag draws.
 - **Undo** takes back the last action (a whole drag counts as one) and **Redo** brings it back.
-  **Reset** empties the grid, and is an action like any other: Undo restores the marks. The last 50
-  actions of every unfinished grid are kept, even after leaving the app.
+  **Reset** empties the grid after asking, and is an action like any other: Undo restores the marks.
+  The last 50 actions of every unfinished grid are kept, even after leaving the app.
+- **Checkpoint** remembers the grid as it is, for the moments when deduction runs dry and something
+  has to be tried out. **Return** brings the grid back to the latest checkpoint; they pile up, and
+  are saved with the grid.
 - A count turns green and underlined when its row or column has the right number of walls (which
   does not prove they are the right ones), red and struck through when it has too many.
 - The row and the column of the cell touched last are lit up to their counts. On grids whose cells
-  are smaller than a fingertip (10×10 and 12×12 on a phone), a magnifier shows what is under the
+  are smaller than a fingertip (10×10 and up on a phone), a magnifier shows what is under the
   finger.
 - **Rules**, under every grid, shows the rules without leaving it.
 - The grid and its planks rest on the bottom of the screen, under the thumb.
 
 ## Modes
 
-- **Campaign**: three difficulties, Easy (8×8), Medium (10×10) and Hard (12×12), with 50 levels each.
-  The 150 grids ship with the app, so level *n* is the same grid for everyone and stays the same
-  from one version to the next. All levels are open from the start; the table of levels shows which
-  ones are begun, and a small picture of each dungeon you solved.
-- **Endless**: randomly generated grids in the size you pick. A grid counts as solved the moment it
+- **Campaign**: five difficulties, Baby (6×6), Easy (8×8), Medium (10×10), Hard (12×12) and Leeroy
+  (14×14), with 50 levels each. The 250 grids ship with the app, so level *n* is the same grid for
+  everyone and stays the same from one version to the next. You pick a difficulty, which shows how
+  many of its levels are solved and bears a seal once they all are, then a level. All levels are
+  open from the start; the table of levels shows which ones are begun, and a small picture of each
+  dungeon you solved.
+- **Endless**: randomly generated grids in the difficulty you pick first. A grid counts as solved the moment it
   is, once; a new one comes after that. **New grid** leaves a grid you do not want to finish, and
   asks first when it has marks, since they are lost. Digging stops as soon as you leave, and gives up (offering
   another grid) rather than search forever.
 - **Tutorial**: a small dungeon solved one deduction at a time. You mark the cells of each step
-  yourself, or ask to be shown.
+  yourself, or ask to be shown. Its sign bears a seal once you went through it.
 - **Continue**, on the main menu, reopens the grid you played last.
 
 Progress on every grid is saved after every action and restored on the next launch. A save holds a
@@ -66,10 +72,14 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 - Vibration on every mark, and keeping the screen on while a grid is shown.
 - Being told when every count is met but a rule is broken (off by default; it never says which rule
   or where).
+- Help (off by default): a **Check** plank under the grid crosses out the marks that are wrong.
 - The magnifier on large grids.
 - Plain digits for the wall counts, instead of the calligraphic ones.
-- Calm mode: monsters, chests and torches stop moving. It starts on when the system animations are
-  turned off.
+- Calm mode: monsters, chests, torches and the spider stop moving. It starts on when the system
+  animations are turned off.
+- **Save to a file** and **Load a file**: progress stays through updates of the app, but Android
+  erases it when the app is removed, which installing a build signed with another key requires
+  (F-Droid's, GitHub's, a debug one). The file holds solved levels, grids in progress and settings.
 
 ## Accessibility
 
@@ -103,7 +113,7 @@ Requires JDK 21 and the Android SDK.
 ```
 
 The rules, the solver, the generator and the campaign file are tested in `GameTest`; drags, undo,
-redo, reset and saves in `SessionTest`. `app/src/main/res/raw/campaign.txt` holds the campaign, one
+redo, reset, checkpoints, the check and saves in `SessionTest`. `app/src/main/res/raw/campaign.txt` holds the campaign, one
 grid per line: it is frozen, a test fails if it changes.
 
 A signed release build needs the keystore at `release.jks` and its password:

@@ -129,12 +129,17 @@ internal fun eyeState(tick: Int, index: Int) = when ((tick + index * 13) % 47) {
 
 /** Draws monster number [kind] of [MONSTERS] in a square of side [cell]. [index] staggers its animation. */
 internal fun DrawScope.drawMonster(kind: Int, bodies: List<List<Painter>>, tick: Int, index: Int, cell: Float) {
-    val monster = MONSTERS[kind]
     val frame = (tick / 3 + index) % 2
     with(bodies[kind][frame]) { draw(Size(cell, cell)) }
+    drawEyes(MONSTERS[kind], tick, index, cell, frame)
+}
+
+/** The eyes of a [monster] where its body would have them. [lurking] in the dark, there is no body: a blink shows nothing. */
+internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: Float, frame: Int = 0, lurking: Boolean = false) {
     val unit = cell / 24
     val r = monster.radius * unit
     val state = eyeState(tick, index)
+    if (lurking && state == Eye.BLINK) return
     for (eye in monster.eyes) {
         val centre = Offset(eye.x, eye.y + frame * monster.bob) * unit
         if (state == Eye.BLINK) {
@@ -167,8 +172,8 @@ internal fun DrawScope.drawMonster(kind: Int, bodies: List<List<Painter>>, tick:
  * [Session.dragTo]); only the finger that started a stroke draws it. [onPaint]
  * is called every time cells were painted, [onStroke] once the stroke is over, with whether it solved
  * the grid. [variety] picks which monsters and wall tiles a grid shows; [focus] cells get a gold
- * outline, and those among them still [toMark] are said so to screen readers. [celebrate] shows the
- * finished dungeon: no dots, monsters hopping, chest pulsing.
+ * outline, and those among them still [toMark] are said so to screen readers. [wrong] cells are
+ * crossed in red. [celebrate] shows the finished dungeon: no dots, monsters hopping, chest pulsing.
  *
  * The grid is one drawing, so every count and every cell is doubled by an invisible node that
  * describes it to accessibility services and lets them mark it.
@@ -181,6 +186,7 @@ internal fun Board(
     variety: Int = 0,
     focus: List<Int> = emptyList(),
     toMark: Set<Int> = emptySet(),
+    wrong: Set<Int> = emptySet(),
     brush: Int = 0,
     onPaint: () -> Unit = {},
     onStroke: (won: Boolean) -> Unit = {},
@@ -326,6 +332,12 @@ internal fun Board(
                 }
                 if (marks[i] == KNOWN_OPEN && !celebrate) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))
             }
+            for (i in wrong) {
+                val a = Offset((i % p.width + 1) * cell, (i / p.width + 1) * cell) + Offset(cell * 0.2f, cell * 0.2f)
+                val reach = cell * 0.6f
+                drawLine(Red, a, a + Offset(reach, reach), cell * 0.12f, StrokeCap.Round)
+                drawLine(Red, a + Offset(reach, 0f), a + Offset(0f, reach), cell * 0.12f, StrokeCap.Round)
+            }
             for (i in focus) {
                 val inset = cell * 0.06f
                 drawRect(
@@ -360,7 +372,8 @@ internal fun Board(
                     val given = i in p.monsters || i in p.chests
                     Box(
                         Modifier.semantics {
-                            contentDescription = "Row ${i / p.width + 1}, column ${i % p.width + 1}: $what" + if (i in toMark) ", to mark" else ""
+                            contentDescription = "Row ${i / p.width + 1}, column ${i % p.width + 1}: $what" +
+                                (if (i in toMark) ", to mark" else "") + if (i in wrong) ", mistake" else ""
                             if (!given && !locked) {
                                 fun mark(label: String, value: Int) = CustomAccessibilityAction(label) {
                                     currentStroke(session.paint(listOf(i), value))

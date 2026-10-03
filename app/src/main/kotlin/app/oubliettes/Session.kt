@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import app.oubliettes.game.Puzzle
 import app.oubliettes.game.drawing
 import app.oubliettes.game.isSolved
+import app.oubliettes.game.solutions
 import kotlin.math.abs
 
 // Mark values for a cell.
@@ -20,6 +21,9 @@ private const val HISTORY = 50
  * The marks of one grid being played, and their history. A stroke is one action: [begin], any number
  * of [dragTo], then [end]. [saved] is what [save] returned earlier; it is ignored unless it was made
  * for this exact puzzle. [legacyId] is what saves of 0.4 were tagged with instead: the seed.
+ *
+ * A [checkpoint] remembers the marks before the player tries something out, when deduction runs dry;
+ * [toCheckpoint] brings back the latest one. They pile up, one per try within a try.
  */
 internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: String? = null) {
     private val width = puzzle.width
@@ -38,8 +42,13 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         private set
     private val undone = mutableStateListOf<IntArray>()
     private val redone = mutableStateListOf<IntArray>()
+    private val checkpoints = mutableStateListOf<IntArray>()
     val canUndo get() = undone.isNotEmpty()
     val canRedo get() = redone.isNotEmpty()
+    val canCheckpoint get() = !solved && marks.any { it != 0 } && checkpoints.lastOrNull()?.contentEquals(marks) != true
+    val canReturn get() = checkpoints.isNotEmpty()
+
+    private val solution by lazy { solutions(puzzle, limit = 1)?.firstOrNull() }
 
     // The stroke in progress.
     private var first = 0
@@ -57,11 +66,12 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
             marks = it
             undone += snapshots(parts.getOrNull(2))
             redone += snapshots(parts.getOrNull(3))
+            checkpoints += snapshots(parts.getOrNull(4))
             settle()
         }
     }
 
-    fun save() = listOf(id, text(marks), undone.joinToString(",", transform = ::text), redone.joinToString(",", transform = ::text))
+    fun save() = (listOf(id, text(marks)) + listOf(undone, redone, checkpoints).map { it.joinToString(",", transform = ::text) })
         .joinToString(":")
 
     private fun text(snapshot: IntArray) = snapshot.joinToString("")
@@ -146,6 +156,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         if (solved) {
             undone.clear()
             redone.clear()
+            checkpoints.clear()
         }
         return solved && !before
     }
@@ -174,8 +185,58 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         settle()
     }
 
+    fun checkpoint() {
+        if (canCheckpoint) checkpoints += marks
+    }
+
+    /** Back to the latest checkpoint, which is used up. An action like any other: Undo brings the try back. */
+    fun toCheckpoint() {
+        if (!canReturn) return
+        record()
+        marks = checkpoints.removeAt(checkpoints.lastIndex)
+        settle()
+    }
+
+    /** The marks that contradict the solution: walls where it is open, dots where it has a wall. */
+    fun mistakes(): Set<Int> {
+        val walls = solution ?: return emptySet()
+        return marks.indices.filter { (marks[it] == WALL && !walls[it]) || (marks[it] == KNOWN_OPEN && walls[it]) }.toSet()
+    }
+
     /** Empties the grid. An action like any other: Undo brings the marks back. */
     fun reset() {
         paint(marks.indices.toList(), 0)
     }
 }
+
+private const val BACKUP = "oubliettes save 1"
+
+/** Everything the app remembers ([all] the preferences), as a text file: a line per entry, its type first. */
+internal fun backupText(all: Map<String, *>) = all.entries.sortedBy { it.key }.mapNotNull { (key, value) ->
+    val type = when (value) {
+        is Boolean -> 'B'
+        is Int -> 'I'
+        is Long -> 'L'
+        is Float -> 'F'
+        is String -> 'S'
+        else -> return@mapNotNull null
+    }
+    "$type$key=$value"
+}.joinToString("\n", prefix = "$BACKUP\n")
+
+/** Null when [text] was not written by [backupText]. */
+internal fun parseBackup(text: String): Map<String, Any>? = runCatching {
+    val lines = text.trim().lines()
+    require(lines[0] == BACKUP)
+    lines.drop(1).associate { line ->
+        val value = line.substringAfter('=')
+        line.substring(1).substringBefore('=').also { require(it.isNotEmpty() && '=' in line) } to when (line[0]) {
+            'B' -> value.toBooleanStrict()
+            'I' -> value.toInt()
+            'L' -> value.toLong()
+            'F' -> value.toFloat()
+            'S' -> value
+            else -> error("type")
+        }
+    }
+}.getOrNull()

@@ -11,8 +11,8 @@ Oubliettes is a logic puzzle. Each grid hides a dungeon: work out where every wa
 
 <b>Features</b>
 <ul>
-<li>Campaign: 150 levels that are the same for everyone, in three difficulties (8×8, 10×10, 12×12), all open from the start.</li>
-<li>Endless: randomly generated grids in the size you pick.</li>
+<li>Campaign: 250 levels that are the same for everyone, in five difficulties (6×6 to 14×14), all open from the start.</li>
+<li>Endless: randomly generated grids in the difficulty you pick.</li>
 <li>Tutorial: a dungeon you solve step by step, one rule at a time.</li>
 <li>Drag to fill a row or column, undo and redo, progress and history saved after every move.</li>
 <li>Screen reader support, a magnifier for large grids, plain digits and a calm mode without animation.</li>

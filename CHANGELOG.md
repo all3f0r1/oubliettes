@@ -6,6 +6,15 @@ Saves, solved levels and settings of 0.5 are kept.
 
 ### Added
 
+- Two difficulties, in Campaign and in Endless: **Baby** (6×6) and **Leeroy** (14×14). The campaign
+  now has 250 levels.
+- **Checkpoint** and **Return**, under the grid: remember the grid before trying something out, and
+  come back to it.
+- Help, in Options and off by default: a **Check** plank crosses out the marks that are wrong.
+- **Save to a file** and **Load a file**, in Options: progress survives removing the app.
+- A seal on the Tutorial once done, on a difficulty once all its levels are solved, and smaller ones
+  on Campaign.
+- A spider on the screens where nothing else moved, and dwellers hopping while Endless digs a grid.
 - **Wall** and **Dot** planks under the grid: the chosen mark is laid at the first tap, without
   going through a wall to reach a dot. Tapping the chosen plank again brings back the cycle.
 - **New grid** in Endless leaves an unsolved grid. It asks first when the grid has marks.
@@ -13,6 +22,18 @@ Saves, solved levels and settings of 0.5 are kept.
 
 ### Changed
 
+- The main menu is the entrance of the dungeon: the name is its sign, and eyes watch from the dark.
+  Each sign tells what it is for: parchment for the Tutorial, on top; a gilded plank for Continue;
+  iron for Options.
+- Campaign and Endless first ask for the difficulty, with how many levels of each are solved.
+- **Reset** asks first.
+- Torches: a quieter flame without sparks, and a light that follows it instead of pulsing.
+- New grids (Endless, and the Baby and Leeroy levels) can all be solved without a guess: the
+  generator only keeps a grid its solver finishes by deduction, trying a cell both ways at most.
+- Grids are dug faster, and 14×14 ones are possible at all: the solver deduces from every rule
+  instead of trying rows one after the other, and a dungeon that gives an ambiguous grid is changed
+  where deduction gets stuck rather than thrown away. Endless grids already begun are kept; a new
+  one is no longer what its seed gave in 0.5.
 - The grid and its planks rest on the bottom of the screen, under the thumb, and **Rules** moved
   down with them.
 - A solved grid says so above the grid, with the progress of its difficulty.

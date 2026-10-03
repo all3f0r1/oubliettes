@@ -169,6 +169,53 @@ class SessionTest {
     }
 
     @Test
+    fun checkpointBringsTheGridBack() {
+        val s = Session(tutorialPuzzle)
+        s.checkpoint()
+        assertFalse("nothing to remember on an empty grid", s.canReturn)
+        s.tap(c(0, 5))
+        s.checkpoint()
+        s.checkpoint() // the same grid twice is one checkpoint
+        s.tap(c(1, 5))
+        s.tap(c(2, 5))
+        s.checkpoint()
+        s.tap(c(3, 5))
+
+        val back = Session(tutorialPuzzle, s.save()) // checkpoints are saved too
+        back.toCheckpoint()
+        assertEquals("111000", back.row(5))
+        back.toCheckpoint()
+        assertEquals("100000", back.row(5))
+        assertFalse(back.canReturn)
+        back.undo() // the try is not lost
+        assertEquals("111000", back.row(5))
+        assertTrue(Session(tutorialPuzzle).also { it.tap(c(0, 5)); it.checkpoint(); it.solve() }.let { it.solved && !it.canReturn })
+    }
+
+    @Test
+    fun mistakesAreTheMarksAgainstTheSolution() {
+        val s = Session(tutorialPuzzle)
+        assertTrue(s.mistakes().isEmpty())
+        s.tap(c(0, 5)) // a wall that is one
+        s.tap(c(0, 0)) // a wall on an open cell
+        s.begin(c(5, 0), KNOWN_OPEN) // a dot on a wall
+        s.end()
+        s.begin(c(1, 0), KNOWN_OPEN) // a dot that is right
+        s.end()
+        assertEquals(setOf(c(0, 0), c(5, 0)), s.mistakes())
+    }
+
+    @Test
+    fun backupRoundTrips() {
+        val all = mapOf("calm" to true, "brush" to 2, "seed8" to -5L, "musicVolume" to 0.5f, "last" to "C:8:3", "marks8_1" to "12:001=:,")
+        assertEquals(all, parseBackup(backupText(all)))
+        assertEquals(emptyMap<String, Any>(), parseBackup(backupText(emptyMap<String, Any>())))
+        for (bad in listOf("", "garbage", backupText(all) + "\nXkey=1", backupText(all) + "\nIkey=one", backupText(all) + "\nSkey")) {
+            assertEquals(bad, null, parseBackup(bad))
+        }
+    }
+
+    @Test
     fun saveOfAnotherGridIsIgnored() {
         val marks = "1".repeat(64)
         val a = generate(8, 8, 1)!!

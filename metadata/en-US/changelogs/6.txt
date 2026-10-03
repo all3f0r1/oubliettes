@@ -1,9 +1,9 @@
-- Wall and Dot planks: lay the chosen mark at the first tap
-- The grid and its planks rest at the bottom of the screen, under the thumb
+- Two difficulties: Baby (6×6) and Leeroy (14×14); the campaign has 250 levels
+- New grids can all be solved without a guess, and are dug faster
+- Checkpoint and Return, to try something out and come back
+- Optional Check plank that crosses out wrong marks
+- The menu is the dungeon entrance; pick a difficulty first
+- Reset asks first; progress can be saved to a file
+- Wall and Dot planks; the grid rests under the thumb
 - The music loops without a gap
-- New grid in Endless leaves a grid you do not want to finish
-- A solved grid is announced above the grid, with your progress
-- Option to be told when every count is met but a rule is broken
-- Screen readers announce a solved grid and the chosen plank
-- Large fonts no longer push the title under the planks
 - Saves of 0.5 are kept
