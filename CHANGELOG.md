@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.6
+
+Saves, solved levels and settings of 0.5 are kept.
+
+### Added
+
+- **Wall** and **Dot** planks under the grid: the chosen mark is laid at the first tap, without
+  going through a wall to reach a dot. Tapping the chosen plank again brings back the cycle.
+- **New grid** in Endless leaves an unsolved grid. It asks first when the grid has marks.
+- An option to be told when every count is met but a rule is broken. Off by default.
+
+### Changed
+
+- The grid and its planks rest on the bottom of the screen, under the thumb, and **Rules** moved
+  down with them.
+- A solved grid says so above the grid, with the progress of its difficulty.
+- The row and the column of the cell touched last are lit over their cells too, not only their counts.
+- The magnifier shows up on 10×10 grids as well: it measured the screen instead of the grid.
+- A chosen plank carries a gold stroke under its lettering, besides its gold rim.
+- In the tutorial, **Back** is now **Previous**.
+
+### Fixed
+
+- The music loops without a gap. It is now decoded once and played from memory, instead of being
+  started over by the system player at every turn.
+- A row drawn from the last column could be taken for the system back gesture.
+- With large fonts, the title no longer runs under the planks and rows of planks wrap.
+- Screen readers announce a solved grid, the tutorial's turn and the chosen plank; sliders are
+  named, screen titles are headings, and a level begun is said once.
+
 ## 0.5
 
 <p>

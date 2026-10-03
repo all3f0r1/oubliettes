@@ -6,3 +6,5 @@ local.properties
 .kotlin/
 *.jks
 keystore.properties
+DESIGN.md
+PRODUCT.md

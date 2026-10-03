@@ -26,6 +26,9 @@ Every grid has exactly one solution. Generated grids also never have walls more 
 ## Controls
 
 - Tap a cell to cycle it: unknown, wall, known open.
+- **Wall** and **Dot**, under the grid, choose what a tap lays instead: that mark at the first tap, or
+  nothing if the cell already had it. Tap the chosen plank again to go back to the cycle. The choice
+  is kept from one grid to the next.
 - Drag to fill a row or a column: the drag stays on the line it started along and fills unknown
   cells, plus the cells of your previous action (drag again over a drag to fix it). Older marks are
   never overwritten. However fast the finger goes, every cell it crosses is filled, and only the
@@ -36,8 +39,10 @@ Every grid has exactly one solution. Generated grids also never have walls more 
 - A count turns green and underlined when its row or column has the right number of walls (which
   does not prove they are the right ones), red and struck through when it has too many.
 - The row and the column of the cell touched last are lit up to their counts. On grids whose cells
-  are smaller than a fingertip (12×12 on a phone), a magnifier shows what is under the finger.
-- **Rules**, at the top of every grid, shows the rules without leaving it.
+  are smaller than a fingertip (10×10 and 12×12 on a phone), a magnifier shows what is under the
+  finger.
+- **Rules**, under every grid, shows the rules without leaving it.
+- The grid and its planks rest on the bottom of the screen, under the thumb.
 
 ## Modes
 
@@ -46,7 +51,8 @@ Every grid has exactly one solution. Generated grids also never have walls more 
   from one version to the next. All levels are open from the start; the table of levels shows which
   ones are begun, and a small picture of each dungeon you solved.
 - **Endless**: randomly generated grids in the size you pick. A grid counts as solved the moment it
-  is, once; a new one comes after that. Digging stops as soon as you leave, and gives up (offering
+  is, once; a new one comes after that. **New grid** leaves a grid you do not want to finish, and
+  asks first when it has marks, since they are lost. Digging stops as soon as you leave, and gives up (offering
   another grid) rather than search forever.
 - **Tutorial**: a small dungeon solved one deduction at a time. You mark the cells of each step
   yourself, or ask to be shown.
@@ -58,6 +64,8 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 ## Options
 
 - Vibration on every mark, and keeping the screen on while a grid is shown.
+- Being told when every count is met but a rule is broken (off by default; it never says which rule
+  or where).
 - The magnifier on large grids.
 - Plain digits for the wall counts, instead of the calligraphic ones.
 - Calm mode: monsters, chests and torches stop moving. It starts on when the system animations are
@@ -67,7 +75,8 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 
 Every cell and every count is exposed to screen readers such as TalkBack: its row and column, what
 it holds, and actions to mark it (double-tap cycles it; Wall, Open and Unknown are offered as
-custom actions). Counts do not rely on colour alone, screens scroll when they do not fit (small
+custom actions). A solved grid, the tutorial's turn and the chosen size or mark are announced, and
+screen titles are headings. Counts and chosen planks do not rely on colour alone, screens scroll when they do not fit (small
 screens, large fonts), and calm mode stops all motion.
 
 ## Sound
@@ -75,7 +84,7 @@ screens, large fonts), and calm mode stops all motion.
 Options has volume sliders for sound effects and music. The music holds the audio focus while it
 plays: it stays silent when another app is already playing (your own music or a podcast keeps
 going), stops when another app starts, and comes back afterwards. The music is a bundled 80-second medieval loop, with
-a shorter and calmer 24-second one for the menus; a checkbox replaces them with the live stream of [Ancient FM](https://ancientfm.com/) (medieval and
+a shorter and calmer 24-second one for the menus, both played from memory so that they loop without a gap; a checkbox replaces them with the live stream of [Ancient FM](https://ancientfm.com/) (medieval and
 Renaissance music, needs an Internet connection — the only thing the app uses the network for).
 
 The loops and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).
