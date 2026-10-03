@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2
+
+Saves, solved levels and settings of 0.6.1 are kept.
+
+### Changed
+
+- The grid sits in the middle of the screen, between the title and the planks.
+- **Check** shows the wrong marks for a second, then rests for a minute. It is greyed on an empty grid.
+- **Return** only appears once a checkpoint is laid, and can be used once the grid has changed since.
+
 ## 0.6.1
 
 Saves, solved levels and settings of 0.6 are kept.

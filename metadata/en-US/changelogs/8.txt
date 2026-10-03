@@ -1,0 +1,4 @@
+- The grid sits in the middle of the screen
+- Check shows the wrong marks for a second, then rests for a minute
+- Return appears once a checkpoint is laid, and works once the grid has changed since
+- Saves of 0.6.1 are kept

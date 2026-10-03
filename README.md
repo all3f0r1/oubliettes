@@ -38,7 +38,7 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   The round arrow over the grid resets it after asking, and is an action like any other: Undo restores the marks.
   The last 50 actions of every unfinished grid are kept, even after leaving the app.
 - **Checkpoint** remembers the grid as it is, for the moments when deduction runs dry and something
-  has to be tried out. **Return** brings the grid back to the latest checkpoint; they pile up, and
+  has to be tried out. **Return** appears once a checkpoint is laid, and brings the grid back to the latest one once it has changed; they pile up, and
   are saved with the grid.
 - A count is dimmed and struck through when its row or column has the right number of walls (which
   does not prove they are the right ones), red and underlined when it has too many.
@@ -72,7 +72,8 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 - Vibration on every mark, and keeping the screen on while a grid is shown.
 - Being told when every count is met but a rule is broken (off by default; it never says which rule
   or where).
-- Help (off by default): a **Check** plank under the grid crosses out the marks that are wrong.
+- Help (off by default): a **Check** plank under the grid crosses out the marks that are wrong for
+  a second, then rests for a minute.
 - The magnifier on large grids.
 - Plain digits for the wall counts, instead of the calligraphic ones.
 - Calm mode: monsters, chests, torches and the spider stop moving. It starts on when the system

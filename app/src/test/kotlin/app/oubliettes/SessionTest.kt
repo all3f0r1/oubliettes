@@ -175,6 +175,7 @@ class SessionTest {
         assertFalse("nothing to remember on an empty grid", s.canReturn)
         s.tap(c(0, 5))
         s.checkpoint()
+        assertTrue("nothing tried yet: nothing to come back from", s.hasCheckpoint && !s.canReturn)
         s.checkpoint() // the same grid twice is one checkpoint
         s.tap(c(1, 5))
         s.tap(c(2, 5))

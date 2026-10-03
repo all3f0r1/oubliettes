@@ -46,7 +46,10 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     val canUndo get() = undone.isNotEmpty()
     val canRedo get() = redone.isNotEmpty()
     val canCheckpoint get() = !solved && marks.any { it != 0 } && checkpoints.lastOrNull()?.contentEquals(marks) != true
-    val canReturn get() = checkpoints.isNotEmpty()
+    val hasCheckpoint get() = checkpoints.isNotEmpty()
+
+    /** Only once the grid has changed since the latest checkpoint: there is something to come back from. */
+    val canReturn get() = checkpoints.lastOrNull()?.contentEquals(marks) == false
 
     private val solution by lazy { solutions(puzzle, limit = 1)?.firstOrNull() }
 

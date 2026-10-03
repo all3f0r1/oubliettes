@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.all3f0r1.oubliettes"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.6.1"
+        versionCode = 8
+        versionName = "0.6.2"
     }
     buildFeatures { compose = true }
     // F-Droid rejects the encrypted dependency list AGP embeds for Google Play.

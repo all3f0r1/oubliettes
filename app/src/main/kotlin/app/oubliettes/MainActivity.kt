@@ -119,6 +119,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
@@ -462,8 +463,8 @@ private fun Difficulties(title: String, onMenu: () -> Unit, detail: (Int) -> Str
 /**
  * Shared frame of the inner screens: a way back, a title, then the content. It scrolls when the
  * content is taller than the screen, unless the content does its own scrolling ([scroll] false).
- * A [low] page rests its content on the bottom of the screen, under the thumb, and leaves the
- * spare room below the title. [end] sits opposite the way back. A [spider] visits the screens where
+ * A page with a [foot] rests it on the bottom of the screen, under the thumb, and centres its
+ * content in the room left under the title. [end] sits opposite the way back. A [spider] visits the screens where
  * nothing else moves; never a grid.
  */
 @Composable
@@ -472,14 +473,13 @@ private fun Page(
     onBack: () -> Unit,
     back: String = "Menu",
     scroll: Boolean = true,
-    low: Boolean = false,
     spider: Boolean = false,
     end: @Composable () -> Unit = {},
+    foot: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) = Box(Modifier.safeDrawingPadding().fillMaxSize()) {
     Column(
         Modifier.fillMaxSize().then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp),
-        verticalArrangement = if (low) Arrangement.SpaceBetween else Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The title between the two planks, or on a line of its own when it does not fit: large fonts.
@@ -506,12 +506,16 @@ private fun Page(
                 name.placeRelative((constraints.maxWidth - name.width) / 2, if (beside) (row - name.height) / 2 else planks + gap)
             }
         }
-        Column(
-            Modifier.padding(top = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            content = content,
-        )
+        if (foot != null) Spacer(Modifier.weight(1f))
+        for (part in listOfNotNull(content, foot)) {
+            Column(
+                Modifier.padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                content = part,
+            )
+            if (foot != null && part === content) Spacer(Modifier.weight(1f))
+        }
     }
     if (spider) Spider()
 }
@@ -571,11 +575,14 @@ private fun Rules() {
     }
 }
 
-/** The grid written down before a try, and the way back to it. [act] wraps what each plank does. */
+/**
+ * The grid written down before a try, and the way back to it: there once a checkpoint is laid, and
+ * of use once the grid has changed since. [act] wraps what each plank does.
+ */
 @Composable
 private fun Checkpoints(session: Session, act: (() -> Unit) -> () -> Unit = { it }) {
     PlankButton("Checkpoint", enabled = session.canCheckpoint, matter = Matter.PARCHMENT, onClick = act(session::checkpoint))
-    PlankButton("Return", enabled = session.canReturn, matter = Matter.PARCHMENT, onClick = act(session::toCheckpoint))
+    if (session.hasCheckpoint) PlankButton("Return", enabled = session.canReturn, matter = Matter.PARCHMENT, onClick = act(session::toCheckpoint))
 }
 
 /** The table of levels of the difficulty [size], or the level being played when [level] is not 0. */
@@ -698,7 +705,7 @@ private fun Endless(prefs: SharedPreferences, audio: Audio, size: Int, onBack: (
                 },
             )
         } else {
-            Page("Endless", onBack, back = "Difficulty", low = true) {
+            Page("Endless", onBack, back = "Difficulty", foot = {}) {
                 Text(status, color = Dim)
                 Column(
                     Modifier.fillMaxWidth().aspectRatio(1f),
@@ -755,7 +762,8 @@ private fun Diggers() {
  * offered once solved; [skip], when given, names a plank over the grid that leaves it unsolved for
  * the next one. [status] is shown above the grid, and [solvedStatus] under the announcement once it is solved.
  *
- * With the help turned on in Options, a Check plank crosses the marks that are wrong, until the next action.
+ * With the help turned on in Options, a Check plank crosses the marks that are wrong for a second,
+ * then rests for a minute.
  */
 @Composable
 private fun Game(
@@ -782,8 +790,17 @@ private fun Game(
     val brush = remember { mutableIntStateOf(prefs.getInt("brush", 0)) }
     // What the player is asked to confirm, by the name of its plank: [skip] or Reset. Empty for nothing.
     var asking by rememberSaveable(puzzle) { mutableStateOf("") }
-    // The marks found wrong by the last check: null when the grid changed since, or was never checked.
+    // The marks found wrong by the check, while they are shown: null the rest of the time.
     var wrong by remember(session) { mutableStateOf<Set<Int>?>(null) }
+    // The Check plank rests after each use.
+    var checked by remember(session) { mutableStateOf(false) }
+    LaunchedEffect(checked) {
+        if (!checked) return@LaunchedEffect
+        delay(1_000)
+        wrong = null
+        delay(59_000)
+        checked = false
+    }
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
 
@@ -802,7 +819,7 @@ private fun Game(
     }
 
     Page(
-        title, onBack, back, low = true,
+        title, onBack, back,
         end = {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (!session.solved) {
@@ -817,6 +834,30 @@ private fun Game(
                 Rules()
             }
         },
+        foot = {
+            if (session.solved) {
+                Planks {
+                    PlankButton("Play again", onClick = act(session::reset))
+                    PlankButton(next, onClick = onNext)
+                }
+            } else {
+                Planks {
+                    Brushes(prefs, brush)
+                    PlankButton("", enabled = session.canUndo, matter = Matter.IRON, glyph = UndoGlyph, description = "Undo", onClick = act(session::undo))
+                    PlankButton("", enabled = session.canRedo, matter = Matter.IRON, glyph = RedoGlyph, description = "Redo", onClick = act(session::redo))
+                }
+                // Apart from the marks and their history: what a try is framed with.
+                Planks {
+                    Checkpoints(session, ::act)
+                    if (help) {
+                        PlankButton("Check", enabled = !checked && session.marks.any { it != 0 }, matter = Matter.IRON) {
+                            wrong = session.mistakes()
+                            checked = true
+                        }
+                    }
+                }
+            }
+        },
     ) {
         // One node, so that screen readers announce what it turns into.
         Column(
@@ -827,11 +868,9 @@ private fun Game(
                 Text("Dungeon solved!", color = Gold, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Text(solvedStatus(), color = Ink)
             } else {
-                Text(status, color = Dim)
-                wrong?.let {
-                    val found = if (it.isEmpty()) "No mistake so far." else if (it.size == 1) "1 mistake, crossed out." else "${it.size} mistakes, crossed out."
-                    Text(found, color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)
-                }
+                // What the check found takes the place of the status while it shows: the grid does not move.
+                val found = wrong?.let { if (it.isEmpty()) "No mistake so far." else if (it.size == 1) "1 mistake, crossed out." else "${it.size} mistakes, crossed out." }
+                if (found != null) Text(found, color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center) else Text(status, color = Dim)
                 if (ruleHint && session.ruleBroken) {
                     Text("Every count is met, yet a rule is broken.", color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)
                 }
@@ -853,23 +892,6 @@ private fun Game(
                 }
             },
         )
-        if (session.solved) {
-            Planks {
-                PlankButton("Play again", onClick = act(session::reset))
-                PlankButton(next, onClick = onNext)
-            }
-        } else {
-            Planks {
-                Brushes(prefs, brush)
-                PlankButton("", enabled = session.canUndo, matter = Matter.IRON, glyph = UndoGlyph, description = "Undo", onClick = act(session::undo))
-                PlankButton("", enabled = session.canRedo, matter = Matter.IRON, glyph = RedoGlyph, description = "Redo", onClick = act(session::redo))
-            }
-            // Apart from the marks and their history: what a try is framed with.
-            Planks {
-                Checkpoints(session, ::act)
-                if (help) PlankButton("Check", matter = Matter.IRON) { wrong = session.mistakes() }
-            }
-        }
     }
     if (asking.isNotEmpty()) {
         Notice(asking, { asking = "" }) {
@@ -903,22 +925,26 @@ private fun Tutorial(prefs: SharedPreferences, onMenu: () -> Unit, onPlay: () ->
     val last = index == tutorialSteps.lastIndex
     LaunchedEffect(last) { if (last) prefs.edit().putBoolean("tutorialDone", true).apply() }
 
-    Page("Tutorial", onMenu, low = true, end = { Rules() }) {
+    Page(
+        "Tutorial", onMenu, end = { Rules() },
+        foot = {
+            Text(step.text, Modifier.fillMaxWidth().heightIn(min = 130.dp), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
+            Text(
+                if (toMark.isNotEmpty()) "Your turn: ${toMark.size} to mark" else "",
+                Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                color = Gold, fontStyle = FontStyle.Italic,
+            )
+            // The step about checkpoints shows them in place of the brushes: a tap still builds its wall.
+            Planks { if (step.checkpoints) Checkpoints(session) else Brushes(prefs, brush) }
+            Planks {
+                PlankButton("Previous", enabled = index > 0) { index-- }
+                PlankButton("Show me", enabled = toMark.isNotEmpty()) { session.show(step) }
+                PlankButton(if (last) "Play" else "Next", enabled = toMark.isEmpty()) { if (last) onPlay() else index++ }
+            }
+        },
+    ) {
         Text("Step ${index + 1} / ${tutorialSteps.size}", color = Dim)
         Board(session, locked = last, celebrate = last && session.solved, focus = step.focus, toMark = toMark, brush = brush.intValue)
-        Text(step.text, Modifier.fillMaxWidth().heightIn(min = 130.dp), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
-        Text(
-            if (toMark.isNotEmpty()) "Your turn: ${toMark.size} to mark" else "",
-            Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            color = Gold, fontStyle = FontStyle.Italic,
-        )
-        // The step about checkpoints shows them in place of the brushes: a tap still builds its wall.
-        Planks { if (step.checkpoints) Checkpoints(session) else Brushes(prefs, brush) }
-        Planks {
-            PlankButton("Previous", enabled = index > 0) { index-- }
-            PlankButton("Show me", enabled = toMark.isNotEmpty()) { session.show(step) }
-            PlankButton(if (last) "Play" else "Next", enabled = toMark.isEmpty()) { if (last) onPlay() else index++ }
-        }
     }
 }
 
@@ -981,7 +1007,7 @@ private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) 
             PrefToggle(prefs, "haptics", "Vibrate on every mark")
             PrefToggle(prefs, "keepScreenOn", "Keep the screen on while playing")
             PrefToggle(prefs, "ruleHint", "Say when every count is met but a rule is broken", default = false)
-            PrefToggle(prefs, "help", "Help: a Check plank under the grid crosses out the wrong marks", default = false)
+            PrefToggle(prefs, "help", "Help: a Check plank under the grid shows the wrong marks for a second, once a minute", default = false)
             PrefToggle(prefs, "magnifier", "Magnifier under the finger on large grids") { Comfort.magnifier = it }
             PrefToggle(prefs, "plainDigits", "Plain digits for the wall counts", Comfort.plainDigits) { Comfort.plainDigits = it }
             PrefToggle(prefs, "calm", "Calm mode: nothing moves on its own", Comfort.calm) { Comfort.calm = it }
