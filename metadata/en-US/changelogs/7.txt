@@ -1,0 +1,7 @@
+- Fewer planks under the grid: Wall and Hallway (the former Dot), undo and redo as arrows, Checkpoint and Return on a line of their own
+- Reset, the rules and the new grid moved over the grid
+- The tutorial has a step about checkpoints
+- A count reached is dimmed and struck through; exceeded, red and underlined
+- An arrow on the planks that lead back
+- The menu sign is an old board nailed over the entrance
+- Saves of 0.6 are kept

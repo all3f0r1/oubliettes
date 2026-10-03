@@ -9,7 +9,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,12 +34,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -94,10 +101,10 @@ internal enum class Matter(val fill: List<Color>, val rim: Color, val ink: Color
     /** The way back into the grid left open: the sign that stands out. */
     GILDED(listOf(Color(0xFF9A6A3A), Color(0xFF6A4322)), Gold, Cream),
 
-    /** Something to read. */
+    /** Something to read, or written down to come back to: the checkpoints. */
     PARCHMENT(listOf(Color(0xFFEAD9B0), Color(0xFFC9B383)), Color(0xFF6B5330), DarkWood),
 
-    /** Machinery: the settings. */
+    /** Machinery: the settings, and what works on the grid as a whole. */
     IRON(listOf(Color(0xFF4C4A5C), Iron), IronEdge, Ink),
 }
 
@@ -126,25 +133,91 @@ internal fun Modifier.plank(enabled: Boolean = true, selected: Boolean = false, 
         }
 }
 
-/** [selected] is for a plank that is one of several choices: null when it is not, and screen readers are told which one is chosen. */
+/** A pictogram drawn in the square it is given, in the ink of its plank. */
+internal typealias Glyph = DrawScope.(ink: Color) -> Unit
+
+/** Strokes these [lines], each through points given in fractions of the square, then what [more] adds to the path. */
+private fun DrawScope.strokes(ink: Color, vararg lines: List<Offset>, more: Path.(Float) -> Unit = {}) {
+    val s = size.width
+    val path = Path()
+    for (line in lines) {
+        for ((index, point) in line.withIndex()) if (index == 0) path.moveTo(point.x * s, point.y * s) else path.lineTo(point.x * s, point.y * s)
+    }
+    path.more(s)
+    drawPath(path, ink, style = Stroke(s * 0.12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+}
+
+/** An arrow to the left: the way back. */
+internal val BackGlyph: Glyph = {
+    strokes(it, listOf(Offset(0.88f, 0.5f), Offset(0.14f, 0.5f)), listOf(Offset(0.44f, 0.2f), Offset(0.14f, 0.5f), Offset(0.44f, 0.8f)))
+}
+
+/** An arrow that turns back on itself. */
+internal val UndoGlyph: Glyph = {
+    strokes(it, listOf(Offset(0.36f, 0.16f), Offset(0.14f, 0.38f), Offset(0.36f, 0.6f)), listOf(Offset(0.14f, 0.38f), Offset(0.6f, 0.38f))) { s ->
+        arcTo(Rect(0.38f * s, 0.38f * s, 0.82f * s, 0.82f * s), -90f, 180f, false)
+        lineTo(0.34f * s, 0.82f * s)
+    }
+}
+
+internal val RedoGlyph: Glyph = { ink -> scale(-1f, 1f) { UndoGlyph(ink) } }
+
+/** An arrow going round: start again. */
+internal val ResetGlyph: Glyph = {
+    strokes(it, listOf(Offset(0.34f, 0.03f), Offset(0.52f, 0.2f), Offset(0.34f, 0.38f))) { s ->
+        arcTo(Rect(0.18f * s, 0.2f * s, 0.82f * s, 0.84f * s), -40f, 300f, true)
+    }
+}
+
+/** Two chevrons: on to the next one. */
+internal val SkipGlyph: Glyph = {
+    strokes(it, listOf(Offset(0.2f, 0.2f), Offset(0.5f, 0.5f), Offset(0.2f, 0.8f)), listOf(Offset(0.54f, 0.2f), Offset(0.84f, 0.5f), Offset(0.54f, 0.8f)))
+}
+
+/** A hallway cell as the grid shows it: open floor and its dot. */
+internal val HallwayGlyph: Glyph = {
+    drawRect(OpenFloor)
+    drawCircle(Ink, size.width * 0.14f)
+}
+
+/**
+ * [selected] is for a plank that is one of several choices: null when it is not, and screen readers
+ * are told which one is chosen. A [glyph] is drawn before the [text], or alone when the text is
+ * empty. With a [description] the plank is a small square one, and that is its name to screen readers.
+ */
 @Composable
 internal fun PlankButton(
     text: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean? = null,
+    matter: Matter = Matter.WOOD,
+    glyph: Glyph? = null,
+    description: String? = null,
     onClick: () -> Unit,
 ) {
-    Box(
+    val ink = if (enabled) matter.ink else Dim
+    val small = description != null
+    Row(
         modifier
-            .plank(enabled, selected == true, inset = 7.dp)
-            .then(if (selected != null) Modifier.semantics { this.selected = selected } else Modifier)
+            .plank(enabled, selected == true, inset = 7.dp, matter = matter)
+            .semantics {
+                if (selected != null) this.selected = selected
+                if (description != null) contentDescription = description
+            }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .defaultMinSize(minWidth = 72.dp, minHeight = 48.dp)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
+            .defaultMinSize(minWidth = if (small) 48.dp else 72.dp, minHeight = 48.dp)
+            .padding(horizontal = if (small || glyph != null) 12.dp else 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, color = if (enabled) Cream else Dim, fontWeight = FontWeight.Bold, fontSize = 17.sp, lineHeight = 19.sp, textAlign = TextAlign.Center)
+        if (glyph != null) Canvas(Modifier.size(if (text.isEmpty()) 22.dp else 16.dp)) { glyph(ink) }
+        if (text.isNotEmpty()) {
+            Text(
+                text, if (small) Modifier.clearAndSetSemantics {} else Modifier,
+                color = ink, fontWeight = FontWeight.Bold, fontSize = 17.sp, lineHeight = 19.sp, textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

@@ -27,21 +27,21 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
 ## Controls
 
 - Tap a cell to cycle it: unknown, wall, known open.
-- **Wall** and **Dot**, under the grid, choose what a tap lays instead: that mark at the first tap, or
+- **Wall** and **Hallway**, under the grid, choose what a tap lays instead: that mark at the first tap, or
   nothing if the cell already had it. Tap the chosen plank again to go back to the cycle. The choice
   is kept from one grid to the next.
 - Drag to fill a row or a column: the drag stays on the line it started along and fills unknown
   cells, plus the cells of your previous action (drag again over a drag to fix it). Older marks are
   never overwritten. However fast the finger goes, every cell it crosses is filled, and only the
   finger that started a drag draws.
-- **Undo** takes back the last action (a whole drag counts as one) and **Redo** brings it back.
-  **Reset** empties the grid after asking, and is an action like any other: Undo restores the marks.
+- The two arrows under the grid undo the last action (a whole drag counts as one) and redo it.
+  The round arrow over the grid resets it after asking, and is an action like any other: Undo restores the marks.
   The last 50 actions of every unfinished grid are kept, even after leaving the app.
 - **Checkpoint** remembers the grid as it is, for the moments when deduction runs dry and something
   has to be tried out. **Return** brings the grid back to the latest checkpoint; they pile up, and
   are saved with the grid.
-- A count turns green and underlined when its row or column has the right number of walls (which
-  does not prove they are the right ones), red and struck through when it has too many.
+- A count is dimmed and struck through when its row or column has the right number of walls (which
+  does not prove they are the right ones), red and underlined when it has too many.
 - The row and the column of the cell touched last are lit up to their counts. On grids whose cells
   are smaller than a fingertip (10×10 and up on a phone), a magnifier shows what is under the
   finger.

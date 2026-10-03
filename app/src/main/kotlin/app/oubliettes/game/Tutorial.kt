@@ -1,7 +1,16 @@
 package app.oubliettes.game
 
-/** One deduction of the guided solve: what it lets the player mark, and which cells it is about. */
-class TutorialStep(val text: String, val walls: List<Int> = emptyList(), val open: List<Int> = emptyList(), val focus: List<Int> = walls + open)
+/**
+ * One deduction of the guided solve: what it lets the player mark, and which cells it is about.
+ * The step about [checkpoints] has them at hand to be tried.
+ */
+class TutorialStep(
+    val text: String,
+    val walls: List<Int> = emptyList(),
+    val open: List<Int> = emptyList(),
+    val focus: List<Int> = walls + open,
+    val checkpoints: Boolean = false,
+)
 
 // '#' wall, '.' open, 'M' monster, 'C' chest.
 private val DRAWING = listOf(
@@ -40,9 +49,9 @@ val tutorialSteps = listOf(
         walls = row(5, 0..5) + col(5, 0..4),
     ),
     TutorialStep(
-        "Rows 3 and 5 ask for a single wall, and it is already placed on the right. Their other " +
-            "cells are therefore open: pick Dot under the grid, then tap them or drag along the row. " +
-            "Without Dot, a tap lays a wall first and a second tap turns it into a dot.",
+        "Rows 3 and 5 ask for a single wall, already placed on the right: their other cells are " +
+            "open. Pick Hallway under the grid, then tap them or drag along the row. Without it, a " +
+            "second tap turns a wall into a hallway.",
         open = row(2, 0..4) + row(4, 1..4),
     ),
     TutorialStep(
@@ -50,6 +59,12 @@ val tutorialSteps = listOf(
             "This one already has one below, so its other neighbours are walls.",
         walls = listOf(c(4, 0), c(3, 1)),
         focus = listOf(c(4, 1), c(4, 0), c(3, 1), c(4, 2)),
+    ),
+    TutorialStep(
+        "On harder grids deduction may run dry, and something has to be tried out. Lay a Checkpoint " +
+            "first: Return brings the grid back to it if the try leads nowhere. Try it: Checkpoint, " +
+            "build a wall anywhere, then Return.",
+        checkpoints = true,
     ),
     TutorialStep(
         "Column 5 has its 2 walls: its last unknown cell is open. Row 4 then asks for 5 walls " +

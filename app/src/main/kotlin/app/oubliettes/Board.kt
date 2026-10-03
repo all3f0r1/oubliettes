@@ -59,7 +59,6 @@ internal val Ink = Color(0xFFF2F0FA)
 internal val Dim = Color(0xFF8D8AA3)
 internal val Gold = Color(0xFFE0B84C)
 internal val Red = Color(0xFFFF6B57)
-private val Green = Color(0xFF7CC47A)
 private val Unknown = Color(0xFF24222D)
 internal val OpenFloor = Color(0xFF3D3A4E)
 
@@ -287,14 +286,14 @@ internal fun Board(
                 drawRect(band, Offset((it % p.width + 1) * cell, 0f), Size(cell, size.height))
             }
 
-            // A count is green and underlined once reached, red and struck through when exceeded:
-            // the line says it without the colour.
+            // A count reached is dimmed and struck through, out of the way; exceeded, it is red and
+            // underlined: the line says it without the colour.
             fun count(want: Int, have: Int, centerX: Float, centerY: Float) {
                 val text = measurer.measure(want.toString(), style)
-                val color = if (have == want) Green else if (have > want) Red else Ink
+                val color = if (have == want) Dim else if (have > want) Red else Ink
                 drawText(text, color, Offset(centerX - text.size.width / 2f, centerY - text.size.height / 2f))
                 val half = cell * 0.26f
-                val line = if (have == want) centerY + cell * 0.36f else centerY
+                val line = if (have > want) centerY + cell * 0.36f else centerY
                 if (have >= want) drawLine(color, Offset(centerX - half, line), Offset(centerX + half, line), cell * 0.06f, StrokeCap.Round)
             }
             for (x in 0 until p.width) {

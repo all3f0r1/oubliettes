@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.1
+
+Saves, solved levels and settings of 0.6 are kept.
+
+### Changed
+
+- Fewer planks under the grid, and each kind has its look: **Wall** and **Hallway** (the former
+  **Dot**) show what they lay, undo and redo are two iron arrows, **Checkpoint** and **Return** are
+  parchment on a line of their own. The line saying what a tap does is gone.
+- Over the grid, opposite the way back: reset (a round arrow), the rules (**?**) and, in Endless,
+  the new grid (two chevrons).
+- The tutorial has a step about checkpoints, where they can be tried.
+- A count reached is dimmed and struck through, out of the way; a count exceeded is red and underlined.
+- The plank that leads back carries an arrow to the left.
+- The sign of the main menu is an old board, split at both ends, nailed askew right over the entrance.
+
 ## 0.6
 
 Saves, solved levels and settings of 0.5 are kept.

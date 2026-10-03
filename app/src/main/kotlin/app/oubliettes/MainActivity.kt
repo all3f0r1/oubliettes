@@ -41,7 +41,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -70,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -79,11 +80,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -99,6 +104,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -133,15 +139,15 @@ private const val LEVELS = 50
 
 private val RULES = listOf(
     "The numbers give how many walls their row or column holds.",
-    "A number turns green and underlined once its count is reached, which does not prove the walls " +
-        "are the right ones. It turns red and struck through when there are too many.",
+    "A number is dimmed and struck through once its count is reached, which does not prove the walls " +
+        "are the right ones. It turns red and underlined when there are too many.",
     "Monsters and chests are never walls.",
     "Every monster sits in a dead end, and every dead end holds a monster.",
     "Every chest is in a treasure room: 3×3 open cells, a single chest (anywhere in the room) and a single opening.",
     "Outside treasure rooms, hallways are one cell wide: no open 2×2 block.",
     "All open cells are connected.",
     "Walls are never more than two cells thick: no 3×3 block of walls.",
-    "Tap a cell to change it: wall, dot (known open), blank. Pick Wall or Dot under the grid to lay " +
+    "Tap a cell to change it: wall, hallway (a dot: known open), blank. Pick Wall or Hallway under the grid to lay " +
         "that mark at the first tap. Drag to fill a row or a column with what the first cell became; a " +
         "drag only fills blank cells and those of your previous action.",
     "When deduction runs dry and you must try something out, lay a Checkpoint first: Return brings " +
@@ -256,6 +262,9 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
 @Composable
 private fun Menu(solved: Int, finished: Int, tutorialDone: Boolean, resume: String?, onResume: () -> Unit, open: (Screen) -> Unit) {
     val wall = painterResource(R.drawable.wall)
+    // How far the sign comes down to hang right over the arch, whatever room the entrance was given.
+    var drop by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     Box(
         Modifier.fillMaxSize().drawBehind {
             // A dungeon wall in the dark: staggered stone blocks.
@@ -277,15 +286,20 @@ private fun Menu(solved: Int, finished: Int, tutorialDone: Boolean, resume: Stri
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // The sign nailed over the entrance.
-                Box(Modifier.semantics { heading() }.plank().padding(horizontal = 30.dp, vertical = 2.dp)) {
+                Box(Modifier.offset { IntOffset(0, drop) }.semantics { heading() }.signboard().padding(horizontal = 34.dp, vertical = 4.dp)) {
                     Text(
                         "Oubliettes",
                         color = Gold,
                         style = TextStyle(fontFamily = Fraktur, fontSize = 50.sp, shadow = Shadow(Color.Black, Offset(0f, 4f), 6f)),
                     )
                 }
-                Entrance(Modifier.weight(1f).fillMaxWidth())
+                Entrance(
+                    Modifier.weight(1f).fillMaxWidth().onSizeChanged {
+                        val arch = arch(it.width.toFloat(), it.height.toFloat())
+                        // Clear of the stones around the arch, less the gap the column already leaves.
+                        drop = (it.height - arch.height - arch.width * STONES + with(density) { 6.dp.toPx() }).toInt()
+                    },
+                )
                 Plank("Tutorial", matter = Matter.PARCHMENT, done = tutorialDone) { open(Screen.TUTORIAL) }
                 if (resume != null) Plank("Continue", resume, matter = Matter.GILDED, onClick = onResume)
                 Row(Modifier.widthIn(max = 320.dp).fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -299,6 +313,44 @@ private fun Menu(solved: Int, finished: Int, tutorialDone: Boolean, resume: Stri
             Spider()
         }
     }
+}
+
+/** The sign over the entrance: one old board, split at both ends, nailed askew. */
+private fun Modifier.signboard() = rotate(-3f).drawBehind {
+    val outline = listOf(
+        0.03f to 0.1f, 0.5f to 0.03f, 0.985f to 0.09f, // the top
+        0.955f to 0.3f, 1f to 0.44f, 0.965f to 0.6f, 0.99f to 0.93f, // the right end, split
+        0.55f to 0.98f, 0.1f to 0.94f, // the bottom
+        0.075f to 0.7f, 0f to 0.64f, 0.04f to 0.4f, 0.01f to 0.24f, // the left end, a corner gone
+    )
+    val board = Path().apply {
+        for ((index, point) in outline.withIndex()) {
+            if (index == 0) moveTo(point.first * size.width, point.second * size.height) else lineTo(point.first * size.width, point.second * size.height)
+        }
+        close()
+    }
+    fun at(x: Float, y: Float) = Offset(x * size.width, y * size.height)
+    drawPath(board, Brush.verticalGradient(Matter.WOOD.fill))
+    clipPath(board) {
+        // The grain, then a crack running in from each end.
+        for (k in 1..4) drawLine(DarkWood.copy(alpha = 0.22f), at(0f, k / 5f), at(1f, k / 5f + if (k % 2 == 0) 0.05f else -0.04f), 1.dp.toPx())
+        drawLine(DarkWood, at(1f, 0.44f), at(0.84f, 0.5f), 1.5.dp.toPx())
+        drawLine(DarkWood, at(0f, 0.64f), at(0.13f, 0.57f), 1.5.dp.toPx())
+    }
+    drawPath(board, DarkWood, style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
+    for (nail in listOf(at(0.085f, 0.3f), at(0.93f, 0.74f))) {
+        drawCircle(DarkWood, 4.dp.toPx(), nail)
+        drawCircle(Color(0xFFB9B4C8), 2.dp.toPx(), nail - Offset(1f, 1f))
+    }
+}
+
+/** How thick the stones around the arch are, in fractions of its width. */
+private const val STONES = 0.13f
+
+/** Width and height of the opening of the entrance, in the room it is given. */
+private fun arch(width: Float, height: Float): Size {
+    val opening = minOf(width * 0.54f, height * 0.8f)
+    return Size(opening, minOf(height, opening * 1.35f))
 }
 
 /** Who lurks in the entrance: which of [MONSTERS], where in the opening and how big, in fractions of its width and height. */
@@ -316,12 +368,11 @@ private fun Entrance(modifier: Modifier) {
     val tick = rememberTick()
     Canvas(modifier) {
         if (size.height < 1f) return@Canvas
-        val width = minOf(size.width * 0.54f, size.height * 0.8f)
-        val height = minOf(size.height, width * 1.35f)
+        val (width, height) = arch(size.width, size.height)
         val left = (size.width - width) / 2
         val top = size.height - height
         val spring = top + width / 2 // where the arch starts
-        val stones = width * 0.13f
+        val stones = width * STONES
         val opening = Path().apply {
             moveTo(left, size.height)
             lineTo(left, spring)
@@ -435,7 +486,7 @@ private fun Page(
         Layout(
             content = {
                 Text(title, Modifier.semantics { heading() }, color = Gold, fontFamily = Fraktur, fontSize = 30.sp, textAlign = TextAlign.Center)
-                PlankButton(back, onClick = onBack)
+                PlankButton(back, glyph = BackGlyph, onClick = onBack)
                 Box { end() }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -492,36 +543,40 @@ private fun Planks(content: @Composable () -> Unit) {
 }
 
 /**
- * Under a grid: what a tap lays, and the rules. [brush] is [WALL] or [KNOWN_OPEN], or 0 when a tap
- * cycles through the marks; it is kept from one grid to the next.
+ * Under a grid: what a tap lays. [brush] is [WALL] or [KNOWN_OPEN], or 0 when a tap cycles through
+ * the marks; it is kept from one grid to the next.
  */
 @Composable
 private fun Brushes(prefs: SharedPreferences, brush: MutableIntState) {
-    var showRules by rememberSaveable { mutableStateOf(false) }
-    Planks {
-        for ((value, name) in listOf(WALL to "Wall", KNOWN_OPEN to "Dot")) {
-            PlankButton(name, selected = brush.intValue == value) {
-                brush.intValue = if (brush.intValue == value) 0 else value
-                prefs.edit().putInt("brush", brush.intValue).apply()
-            }
-        }
-        Spacer(Modifier.width(8.dp))
-        PlankButton("Rules") { showRules = true }
-    }
-    if (showRules) {
-        Notice("Rules", { showRules = false }) {
-            for (rule in RULES) Text(rule, Modifier.fillMaxWidth(), color = Ink, fontSize = 16.sp, lineHeight = 20.sp)
-            PlankButton("Close") { showRules = false }
+    val wall = painterResource(R.drawable.wall)
+    val bricks: Glyph = { with(wall) { draw(size) } }
+    for ((value, name, glyph) in listOf(Triple(WALL, "Wall", bricks), Triple(KNOWN_OPEN, "Hallway", HallwayGlyph))) {
+        PlankButton(name, selected = brush.intValue == value, glyph = glyph) {
+            brush.intValue = if (brush.intValue == value) 0 else value
+            prefs.edit().putInt("brush", brush.intValue).apply()
         }
     }
 }
 
-/** What a tap and a drag do with this [brush], in one line. */
-private fun hint(brush: Int) = when (brush) {
-    WALL -> "Tap: wall or blank"
-    KNOWN_OPEN -> "Tap: dot or blank"
-    else -> "Tap: wall, dot, blank"
-} + " · Drag: fill a line"
+/** Over a grid, opposite the way back: the rules, on parchment. */
+@Composable
+private fun Rules() {
+    var show by rememberSaveable { mutableStateOf(false) }
+    PlankButton("?", matter = Matter.PARCHMENT, description = "Rules") { show = true }
+    if (show) {
+        Notice("Rules", { show = false }) {
+            for (rule in RULES) Text(rule, Modifier.fillMaxWidth(), color = Ink, fontSize = 16.sp, lineHeight = 20.sp)
+            PlankButton("Close") { show = false }
+        }
+    }
+}
+
+/** The grid written down before a try, and the way back to it. [act] wraps what each plank does. */
+@Composable
+private fun Checkpoints(session: Session, act: (() -> Unit) -> () -> Unit = { it }) {
+    PlankButton("Checkpoint", enabled = session.canCheckpoint, matter = Matter.PARCHMENT, onClick = act(session::checkpoint))
+    PlankButton("Return", enabled = session.canReturn, matter = Matter.PARCHMENT, onClick = act(session::toCheckpoint))
+}
 
 /** The table of levels of the difficulty [size], or the level being played when [level] is not 0. */
 @Composable
@@ -697,8 +752,8 @@ private fun Diggers() {
  * One grid being played. Marks and their history are saved under [saveKey] after every action;
  * [legacyId] is what a save of 0.4 was tagged with. [onSolved] receives the picture of the finished
  * dungeon, the moment it is solved and again whenever a solved grid is reopened. [onNext] is only
- * offered once solved; [skip], when given, names a plank that leaves an unsolved grid for the next
- * one. [status] is shown above the grid, and [solvedStatus] under the announcement once it is solved.
+ * offered once solved; [skip], when given, names a plank over the grid that leaves it unsolved for
+ * the next one. [status] is shown above the grid, and [solvedStatus] under the announcement once it is solved.
  *
  * With the help turned on in Options, a Check plank crosses the marks that are wrong, until the next action.
  */
@@ -749,8 +804,18 @@ private fun Game(
     Page(
         title, onBack, back, low = true,
         end = {
-            // The marks of a grid left this way are gone for good: ask first when there are any.
-            if (skip != null && !session.solved) PlankButton(skip) { if (session.marks.any { it != 0 }) asking = skip else onNext() }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (!session.solved) {
+                    // The marks of a grid left this way are gone for good: ask first when there are any.
+                    if (skip != null) {
+                        PlankButton("", glyph = SkipGlyph, description = skip) { if (session.marks.any { it != 0 }) asking = skip else onNext() }
+                    }
+                    PlankButton("", enabled = session.marks.any { it != 0 }, matter = Matter.IRON, glyph = ResetGlyph, description = "Reset") {
+                        asking = "Reset"
+                    }
+                }
+                Rules()
+            }
         },
     ) {
         // One node, so that screen readers announce what it turns into.
@@ -794,18 +859,16 @@ private fun Game(
                 PlankButton(next, onClick = onNext)
             }
         } else {
-            Brushes(prefs, brush)
             Planks {
-                PlankButton("Undo", enabled = session.canUndo, onClick = act(session::undo))
-                PlankButton("Redo", enabled = session.canRedo, onClick = act(session::redo))
-                PlankButton("Reset", enabled = session.marks.any { it != 0 }) { asking = "Reset" }
+                Brushes(prefs, brush)
+                PlankButton("", enabled = session.canUndo, matter = Matter.IRON, glyph = UndoGlyph, description = "Undo", onClick = act(session::undo))
+                PlankButton("", enabled = session.canRedo, matter = Matter.IRON, glyph = RedoGlyph, description = "Redo", onClick = act(session::redo))
             }
+            // Apart from the marks and their history: what a try is framed with.
             Planks {
-                PlankButton("Checkpoint", enabled = session.canCheckpoint, onClick = act(session::checkpoint))
-                PlankButton("Return", enabled = session.canReturn, onClick = act(session::toCheckpoint))
-                if (help) PlankButton("Check") { wrong = session.mistakes() }
+                Checkpoints(session, ::act)
+                if (help) PlankButton("Check", matter = Matter.IRON) { wrong = session.mistakes() }
             }
-            Text(hint(brush.intValue), color = Dim, fontSize = 15.sp, textAlign = TextAlign.Center)
         }
     }
     if (asking.isNotEmpty()) {
@@ -840,7 +903,7 @@ private fun Tutorial(prefs: SharedPreferences, onMenu: () -> Unit, onPlay: () ->
     val last = index == tutorialSteps.lastIndex
     LaunchedEffect(last) { if (last) prefs.edit().putBoolean("tutorialDone", true).apply() }
 
-    Page("Tutorial", onMenu, low = true) {
+    Page("Tutorial", onMenu, low = true, end = { Rules() }) {
         Text("Step ${index + 1} / ${tutorialSteps.size}", color = Dim)
         Board(session, locked = last, celebrate = last && session.solved, focus = step.focus, toMark = toMark, brush = brush.intValue)
         Text(step.text, Modifier.fillMaxWidth().heightIn(min = 130.dp), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
@@ -849,7 +912,8 @@ private fun Tutorial(prefs: SharedPreferences, onMenu: () -> Unit, onPlay: () ->
             Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             color = Gold, fontStyle = FontStyle.Italic,
         )
-        Brushes(prefs, brush)
+        // The step about checkpoints shows them in place of the brushes: a tap still builds its wall.
+        Planks { if (step.checkpoints) Checkpoints(session) else Brushes(prefs, brush) }
         Planks {
             PlankButton("Previous", enabled = index > 0) { index-- }
             PlankButton("Show me", enabled = toMark.isNotEmpty()) { session.show(step) }
