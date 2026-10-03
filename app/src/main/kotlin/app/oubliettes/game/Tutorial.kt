@@ -41,8 +41,8 @@ val tutorialSteps = listOf(
     ),
     TutorialStep(
         "Rows 3 and 5 ask for a single wall, and it is already placed on the right. Their other " +
-            "cells are therefore open: tap them twice for a dot. A drag paints what its first cell " +
-            "becomes: tap one cell, then drag from it to lay dots.",
+            "cells are therefore open: pick Dot under the grid, then tap them or drag along the row. " +
+            "Without Dot, a tap lays a wall first and a second tap turns it into a dot.",
         open = row(2, 0..4) + row(4, 1..4),
     ),
     TutorialStep(

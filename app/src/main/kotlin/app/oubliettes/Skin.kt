@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -75,7 +78,10 @@ internal fun rememberTick(): State<Int> = produceState(0, Comfort.calm) {
     }
 }
 
-/** A wooden plank with iron rivets [inset] from its corners. Greyed when not [enabled], gold-rimmed when [selected]. */
+/**
+ * A wooden plank with iron rivets [inset] from its corners. Greyed when not [enabled]. When [selected]
+ * it is rimmed in gold and a gold stroke is painted under its lettering: the colour is not alone to say it.
+ */
 internal fun Modifier.plank(enabled: Boolean = true, selected: Boolean = false, inset: Dp = 12.dp): Modifier {
     val shape = RoundedCornerShape(6.dp)
     val wood = if (enabled) listOf(Color(0xFF8A5C34), Color(0xFF5A391D)) else listOf(Color(0xFF453C36), Color(0xFF332C28))
@@ -89,20 +95,26 @@ internal fun Modifier.plank(enabled: Boolean = true, selected: Boolean = false, 
                 drawCircle(DarkWood, radius, Offset(x, y))
                 drawCircle(if (enabled) Color(0xFFB9B4C8) else Dim, radius / 2, Offset(x - 1, y - 1))
             }
+            if (selected) {
+                val y = size.height - 6.5.dp.toPx()
+                drawLine(Gold, Offset(size.width * 0.3f, y), Offset(size.width * 0.7f, y), 2.dp.toPx(), StrokeCap.Round)
+            }
         }
 }
 
+/** [selected] is for a plank that is one of several choices: null when it is not, and screen readers are told which one is chosen. */
 @Composable
 internal fun PlankButton(
     text: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selected: Boolean = false,
+    selected: Boolean? = null,
     onClick: () -> Unit,
 ) {
     Box(
         modifier
-            .plank(enabled, selected, inset = 7.dp)
+            .plank(enabled, selected == true, inset = 7.dp)
+            .then(if (selected != null) Modifier.semantics { this.selected = selected } else Modifier)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .defaultMinSize(minWidth = 72.dp, minHeight = 48.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -128,15 +140,15 @@ internal fun IronCheck(checked: Boolean) {
     }
 }
 
-/** Slider from 0 to 1: an iron bar filling with gold, and a riveted knob. */
+/** Slider from 0 to 1: an iron bar filling with gold, and a riveted knob. [label] names it to screen readers. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun IronSlider(value: Float, onValueChange: (Float) -> Unit, onValueChangeFinished: (() -> Unit)? = null) {
+internal fun IronSlider(label: String, value: Float, onValueChange: (Float) -> Unit, onValueChangeFinished: (() -> Unit)? = null) {
     Slider(
         value = value,
         onValueChange = onValueChange,
         // Sliders reach the screen edge: keep the system back gesture from stealing their drags.
-        modifier = Modifier.systemGestureExclusion(),
+        modifier = Modifier.systemGestureExclusion().semantics { contentDescription = label },
         onValueChangeFinished = onValueChangeFinished,
         thumb = {
             Canvas(Modifier.size(28.dp)) {

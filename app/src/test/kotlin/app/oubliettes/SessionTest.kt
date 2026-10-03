@@ -73,6 +73,39 @@ class SessionTest {
     }
 
     @Test
+    fun brushLaysItsMarkAtOnce() {
+        val s = Session(tutorialPuzzle)
+        s.begin(c(0, 2), KNOWN_OPEN) // a dot at the first tap, with no wall on the way
+        s.dragTo(4, 2)
+        s.end()
+        assertEquals("222220", s.row(2))
+        s.begin(c(0, 2), KNOWN_OPEN) // already a dot: the brush takes it off
+        s.end()
+        assertEquals("022220", s.row(2))
+        s.begin(c(0, 2), WALL)
+        s.end()
+        assertEquals("122220", s.row(2))
+        s.undo()
+        s.undo()
+        s.undo() // three strokes, three actions
+        assertTrue(s.marks.all { it == 0 })
+    }
+
+    @Test
+    fun countsMetIsNotSolved() {
+        val s = Session(tutorialPuzzle)
+        assertFalse("an empty grid breaks no rule yet", s.ruleBroken)
+        // The solution with two walls swapped between rows 1 and 4: every count holds, the dungeon does not.
+        val walls = tutorialSolution.indices.filter { tutorialSolution[it] } - setOf(c(4, 0), c(0, 3)) + setOf(c(0, 0), c(4, 3))
+        assertFalse(s.paint(walls, WALL))
+        assertTrue(s.ruleBroken)
+        s.reset()
+        assertFalse(s.ruleBroken)
+        assertTrue(s.solve())
+        assertFalse("a solved grid breaks none", s.ruleBroken)
+    }
+
+    @Test
     fun undoRedoAndReset() {
         val s = Session(tutorialPuzzle)
         assertFalse(s.canUndo || s.canRedo)

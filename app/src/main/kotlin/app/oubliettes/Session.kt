@@ -32,6 +32,10 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         private set
     var solved by mutableStateOf(false)
         private set
+
+    /** Every row and column holds its number of walls, and yet the grid is not solved. */
+    var ruleBroken by mutableStateOf(false)
+        private set
     private val undone = mutableStateListOf<IntArray>()
     private val redone = mutableStateListOf<IntArray>()
     val canUndo get() = undone.isNotEmpty()
@@ -71,6 +75,9 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
 
     private fun settle() {
         solved = isSolved(puzzle, walls())
+        ruleBroken = !solved &&
+            (0 until puzzle.height).all { y -> (0 until width).count { marks[y * width + it] == WALL } == puzzle.rowCounts[y] } &&
+            (0 until width).all { x -> (0 until puzzle.height).count { marks[it * width + x] == WALL } == puzzle.colCounts[x] }
     }
 
     /** Call before changing [marks]: the change becomes one action of the history. */
@@ -81,16 +88,21 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     }
 
     /**
-     * Starts a stroke: [cell] cycles through unknown, wall, known open, and the stroke will paint the
-     * value it got. False, and nothing happens, on a monster or a chest.
+     * Starts a stroke on [cell], and the stroke will paint the value the cell got. With no [brush] the
+     * cell cycles through unknown, wall, known open; with one ([WALL] or [KNOWN_OPEN]) it takes that
+     * mark, or loses it if it already had it. False, and nothing happens, on a monster or a chest.
      */
-    fun begin(cell: Int): Boolean {
+    fun begin(cell: Int, brush: Int = 0): Boolean {
         if (given(cell)) return false
         // The cells the previous action changed: this stroke may paint over those.
         repaint = undone.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet()
         record()
         first = cell
-        value = (marks[cell] + 1) % 3
+        value = when {
+            brush == 0 -> (marks[cell] + 1) % 3
+            marks[cell] == brush -> 0
+            else -> brush
+        }
         alongRow = null
         marks = marks.copyOf().also { it[cell] = value }
         return true
