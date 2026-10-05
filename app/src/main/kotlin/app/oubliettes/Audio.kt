@@ -10,21 +10,18 @@ import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
-import android.media.MediaPlayer
 import android.media.SoundPool
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
-private const val RADIO_URL = "https://mediaserv73.live-streams.nl:18058/stream" // Ancient FM, ancientfm.com
 
-private enum class Source { NONE, MENU, LOOP, RADIO }
+private enum class Source { NONE, MENU, LOOP }
 
 /** A decoded sound: [size] bytes of 16-bit samples. */
 private class Pcm(val bytes: ByteArray, val size: Int, val rate: Int, val channels: Int)
@@ -127,16 +124,13 @@ private class Loop(context: Context, resource: Int, attributes: AudioAttributes,
 }
 
 /**
- * Sound effects plus background music: the bundled loops (a calmer one for the menus), or the Ancient FM stream when asked.
+ * Sound effects plus background music: the bundled loops (a calmer one for the menus).
  * The music holds the audio focus while it plays. It stays silent when another app is already
  * playing, stops when another app takes the focus, and comes back when the focus does.
  */
 class Audio(private val context: Context, private val prefs: SharedPreferences) {
     var soundVolume by mutableFloatStateOf(prefs.getFloat("soundVolume", 0.7f))
     var musicVolume by mutableFloatStateOf(prefs.getFloat("musicVolume", 0.5f))
-    var radio by mutableStateOf(prefs.getBoolean("radio", false))
-    var radioFailed by mutableStateOf(false)
-        private set
 
     private val attributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_GAME)
@@ -146,7 +140,6 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     val click = pool.load(context, R.raw.sfx_click, 1)
     private val victory = pool.load(context, R.raw.sfx_victory, 1)
 
-    private var player: MediaPlayer? = null // the radio
     private var loop: Loop? = null // a bundled loop
     private val decoded = ConcurrentHashMap<Int, Pcm>()
     private var source = Source.NONE
@@ -194,17 +187,14 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     }
 
     /** Persists the settings and applies them to the music. Call after changing any of them. */
-    fun save(retryRadio: Boolean = false) {
-        prefs.edit().putFloat("soundVolume", soundVolume).putFloat("musicVolume", musicVolume)
-            .putBoolean("radio", radio).apply()
-        if (retryRadio) radioFailed = false
+    fun save() {
+        prefs.edit().putFloat("soundVolume", soundVolume).putFloat("musicVolume", musicVolume).apply()
         sync()
     }
 
     /** Music only plays while the app is on screen. */
     fun setForeground(value: Boolean) {
         foreground = value
-        if (value) radioFailed = false // the network may be back
         sync()
     }
 
@@ -217,7 +207,6 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     fun release() {
         handler.removeCallbacksAndMessages(null)
         manager.abandonAudioFocusRequest(focusRequest)
-        player?.release()
         loop?.stop()
         pool.release()
     }
@@ -234,42 +223,19 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
         }
         val want = when {
             !wanted || !focused || paused -> Source.NONE
-            radio && !radioFailed -> Source.RADIO
             menu -> Source.MENU
             else -> Source.LOOP
         }
         if (want != source) {
-            player?.release()
             loop?.stop()
             source = want
             loop = when (want) {
                 Source.MENU -> Loop(context, R.raw.menu, attributes, decoded)
                 Source.LOOP -> Loop(context, R.raw.music, attributes, decoded)
-                else -> null
-            }
-            player = when (want) {
-                Source.NONE, Source.MENU, Source.LOOP -> null
-                Source.RADIO -> MediaPlayer().apply {
-                    setAudioAttributes(attributes)
-                    setDataSource(RADIO_URL)
-                    var connected = false
-                    setOnPreparedListener { connected = true; it.start() }
-                    // A live stream only ends or errors when the connection is lost: fall back to the loop.
-                    setOnCompletionListener { radioLost() }
-                    setOnErrorListener { _, _, _ -> radioLost(); true }
-                    prepareAsync()
-                    // Offline, the connection attempt can hang for minutes: give up well before that.
-                    handler.postDelayed({ if (player === this && !connected) radioLost() }, 15_000)
-                }
+                Source.NONE -> null
             }
         }
         val v = if (hushed) 0f else musicVolume * musicVolume
-        player?.setVolume(v, v)
         loop?.volume = v
-    }
-
-    private fun radioLost() {
-        radioFailed = true
-        sync()
     }
 }

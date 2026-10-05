@@ -996,13 +996,6 @@ private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) 
             IronSlider("Sounds", audio.soundVolume, { audio.soundVolume = it; audio.save() }, onValueChangeFinished = { audio.play(audio.click) })
             Text("Music", Modifier.clearAndSetSemantics {}, color = Ink, fontWeight = FontWeight.Bold)
             IronSlider("Music", audio.musicVolume, { audio.musicVolume = it; audio.save() })
-            Toggle("Replace music loops by radio", audio.radio) { audio.radio = it; audio.save(retryRadio = true) }
-            Text(
-                "Ancient FM (ancientfm.com): live medieval and Renaissance music. " +
-                    "Needs an Internet connection.",
-                color = Dim, fontSize = 15.sp,
-            )
-            if (audio.radioFailed) Text("Radio unavailable: back to the music loops.", color = Red, fontSize = 15.sp)
             Spacer(Modifier.height(8.dp))
             PrefToggle(prefs, "haptics", "Vibrate on every mark")
             PrefToggle(prefs, "keepScreenOn", "Keep the screen on while playing")

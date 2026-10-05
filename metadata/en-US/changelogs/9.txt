@@ -1,0 +1,3 @@
+- The radio option is gone: Ancient FM is not free software or free content
+- The app no longer asks for the Internet permission
+- Saves of 0.6.2 are kept

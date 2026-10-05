@@ -7,7 +7,7 @@ A logic puzzle game for Android: work out where the dungeon walls are from the c
   <img src="metadata/en-US/images/phoneScreenshots/2-game.png" width="190" alt="An 8×8 grid in progress: walls, dots, monsters, a chest, the wall counts, and the Undo, Redo and Reset planks" />
   <img src="metadata/en-US/images/phoneScreenshots/3-solved.png" width="190" alt="A solved grid, all counts green and underlined, with Play again and Next level" />
   <img src="metadata/en-US/images/phoneScreenshots/4-tutorial.png" width="190" alt="Tutorial step about monsters and dead ends, with two cells left for the player to mark" />
-  <img src="metadata/en-US/images/phoneScreenshots/5-options.png" width="190" alt="Options: sound and music sliders, radio, vibration, screen, magnifier, plain digits and calm mode" />
+  <img src="metadata/en-US/images/phoneScreenshots/5-options.png" width="190" alt="Options: sound and music sliders, vibration, screen, magnifier, plain digits and calm mode" />
   <img src="metadata/en-US/images/phoneScreenshots/6-levels.png" width="190" alt="Campaign: the table of levels, the solved one showing its dungeon, the next one marked as begun" />
 </p>
 
@@ -95,8 +95,7 @@ screens, large fonts), and calm mode stops all motion.
 Options has volume sliders for sound effects and music. The music holds the audio focus while it
 plays: it stays silent when another app is already playing (your own music or a podcast keeps
 going), stops when another app starts, and comes back afterwards. The music is a bundled 80-second medieval loop, with
-a shorter and calmer 24-second one for the menus, both played from memory so that they loop without a gap; a checkbox replaces them with the live stream of [Ancient FM](https://ancientfm.com/) (medieval and
-Renaissance music, needs an Internet connection — the only thing the app uses the network for).
+a shorter and calmer 24-second one for the menus, both played from memory so that they loop without a gap. The app never uses the network.
 
 The loops and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).
 

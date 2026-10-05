@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.3
+
+Saves, solved levels and settings of 0.6.2 are kept.
+
+### Removed
+
+- The radio option: Ancient FM is free of charge and of adverts, but it is not free software or
+  free content. The bundled loops are the only music, and the app no longer asks for the Internet
+  permission.
+
 ## 0.6.2
 
 Saves, solved levels and settings of 0.6.1 are kept.

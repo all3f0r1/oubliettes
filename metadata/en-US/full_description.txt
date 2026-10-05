@@ -20,4 +20,4 @@ Oubliettes is a logic puzzle. Each grid hides a dungeon: work out where every wa
 <li>Original medieval music loops and sound effects, with volume sliders.</li>
 </ul>
 
-The music can optionally be replaced by the live stream of Ancient FM (ancientfm.com). This is off by default and is the only thing the app uses the network for.
+The app never uses the network: it does not ask for the Internet permission.
