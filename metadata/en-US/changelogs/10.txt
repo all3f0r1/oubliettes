@@ -1,0 +1,6 @@
+- Endless: pick a size and a reasoning (Gentle, Tricky, Fiendish); the next grid comes by itself
+- New campaign of 250 grids, each difficulty from the least reasoning to the most: former campaign progress is forgotten
+- More detailed dungeon: paved floors, shadows, breathing monsters, wavering torches
+- Quit plank on the menu; Baby is now Novice
+- Told by default when every count is met but a rule is broken
+- Check shows the wrong marks for three seconds

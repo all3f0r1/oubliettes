@@ -58,6 +58,7 @@ private class Deducer(val p: Puzzle) {
     private var size = 0
     private var c = IntArray(0)
     private var broken = false
+    var probes = 0 // how many times [probe] had to try a cell both ways to get further
     private var cut = false // a cell changed since the dungeon was last checked to be in one piece
 
     private fun set(i: Int, value: Int) {
@@ -205,6 +206,7 @@ private class Deducer(val p: Puzzle) {
                     (c[cell] == 0 && value != 0).also { if (it) c[cell] = value }
                 }
                 if (found.isNotEmpty()) {
+                    probes++
                     settled = true
                     if (!deduce(c, found.toIntArray())) return false
                 }
@@ -221,6 +223,16 @@ private class Deducer(val p: Puzzle) {
 internal fun stuck(p: Puzzle): List<Int>? = with(Deducer(p)) {
     val c = start
     if (deduce(c) && probe(c)) c.indices.filter { c[it] == 0 } else null
+}
+
+/**
+ * How hard [p] is to reason through: how many times solving it takes trying a cell both ways. None
+ * when its rules alone, applied one after the other, give every cell.
+ */
+internal fun probes(p: Puzzle): Int = with(Deducer(p)) {
+    val c = start
+    if (deduce(c)) probe(c)
+    probes
 }
 
 /**

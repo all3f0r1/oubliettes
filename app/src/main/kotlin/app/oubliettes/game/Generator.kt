@@ -11,10 +11,13 @@ private const val REPAIRS = 150
 
 /**
  * Deterministic: the same size and seed always give the same puzzle. It has exactly one solution,
- * which can be reached without a guess: see [stuck].
+ * which can be reached without a guess: see [stuck]. With [reasoning], only a grid whose [probes] are
+ * in that range will do.
  * Null when [cancelled] answered true, or when [maxTries] dungeons were not enough.
  */
-fun generate(width: Int, height: Int, seed: Long, maxTries: Int = MAX_TRIES, cancelled: () -> Boolean = { false }): Puzzle? {
+fun generate(
+    width: Int, height: Int, seed: Long, maxTries: Int = MAX_TRIES, reasoning: IntRange? = null, cancelled: () -> Boolean = { false },
+): Puzzle? {
     val rng = Random(seed xor (width.toLong() shl 32) xor (height.toLong() shl 48))
     repeat(maxTries) {
         if (cancelled()) return null
@@ -41,7 +44,7 @@ fun generate(width: Int, height: Int, seed: Long, maxTries: Int = MAX_TRIES, can
                 walls[cell] = !walls[cell]
             }
         }
-        if (left.isEmpty()) return p
+        if (left.isEmpty() && (reasoning == null || probes(p) in reasoning)) return p
     }
     return null
 }

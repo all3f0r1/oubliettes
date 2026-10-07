@@ -153,6 +153,13 @@ class GameTest {
                     "${monsters.toDouble() / seeds} monsters, ${chests.toDouble() / seeds} chests, $walls% walls",
             )
         }
+        // A grid can be asked for by how much reasoning it takes.
+        for (seed in 0L until 20) {
+            assertEquals(0, probes(generate(8, 8, seed, reasoning = 0..0)!!))
+            assertTrue(probes(generate(8, 8, seed, reasoning = 10..Int.MAX_VALUE)!!) >= 10)
+        }
+        // The rarest the game asks for, in the size that takes longest to dig.
+        for (seed in 0L until 10) assertTrue(probes(generate(14, 14, seed, reasoning = 62..Int.MAX_VALUE)!!) >= 62)
         val a = generate(8, 8, 42)!!
         val b = generate(8, 8, 42)!!
         assertTrue(a.rowCounts.contentEquals(b.rowCounts) && a.monsters == b.monsters && a.chests == b.chests)
@@ -188,14 +195,15 @@ class GameTest {
     fun campaignIsFrozenAndSound() {
         val lines = File("src/main/res/raw/campaign.txt").readLines()
         assertEquals(250, lines.size)
-        // The grids of 0.4 first, then the 6x6 and 14x14 ones.
-        assertEquals("the campaign changed: saves and solved levels of players would no longer match", -1974651446, lines.take(150).hashCode())
-        assertEquals("the campaign changed: saves and solved levels of players would no longer match", 422717499, lines.hashCode())
+        assertEquals("the campaign changed: saves and solved levels of players would no longer match", 2122569899, lines.hashCode())
         for ((index, line) in lines.withIndex()) {
             val p = decodePuzzle(line)!!
-            assertEquals(listOf(8, 10, 12, 6, 14)[index / 50], p.width)
+            assertEquals(listOf(6, 8, 10, 12, 14)[index / 50], p.width)
             assertEquals(p.width, p.height)
             assertEquals("level ${index + 1}", 1, solutions(p, maxNodes = Int.MAX_VALUE)!!.size)
+            assertEquals("level ${index + 1} solved without a guess", emptyList<Int>(), stuck(p))
         }
+        // Each size goes from the grid that asks for the least reasoning to the one that asks for the most.
+        for (levels in lines.chunked(50)) assertEquals(levels.map { probes(decodePuzzle(it)!!) }.sorted(), levels.map { probes(decodePuzzle(it)!!) })
     }
 }

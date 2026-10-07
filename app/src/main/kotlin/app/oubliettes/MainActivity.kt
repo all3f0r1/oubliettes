@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -124,19 +125,30 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 private val SIZES = listOf(6, 8, 10, 12, 14)
-private val DIFFICULTIES = listOf("Baby", "Easy", "Medium", "Hard", "Leeroy") // one per entry of SIZES
+private val DIFFICULTIES = listOf("Novice", "Easy", "Medium", "Hard", "Leeroy") // one per entry of SIZES
 
 private fun difficulty(size: Int) = DIFFICULTIES[SIZES.indexOf(size)]
+
+// How much reasoning an Endless grid asks for. Larger grids take more [probes] whatever they are: each
+// entry of SIZES has its own two cuts, where they leave about a third of what the generator digs on either side.
+private val REASONINGS = listOf("Gentle", "Tricky", "Fiendish")
+private val CUTS = listOf(1 to 3, 2 to 9, 15 to 25, 33 to 45, 51 to 62)
+
+private fun probesOf(size: Int, reasoning: Int) = CUTS[SIZES.indexOf(size)].let { (tricky, fiendish) ->
+    listOf(0 until tricky, tricky until fiendish, fiendish..Int.MAX_VALUE)[reasoning]
+}
 
 /** Campaign levels of this [size] solved so far. */
 private fun SharedPreferences.solved(size: Int) = all.keys.count { it.startsWith("done${size}_") }
 
 /**
  * Campaign levels per difficulty. The grids are frozen in res/raw/campaign.txt, one per line, the
- * 50 of each size in turn (8, 10 and 12, then 6 and 14, which came later): they stay the same
- * whatever becomes of the generator.
+ * 50 of each size in turn, from the one that asks for the least reasoning to the one that asks for
+ * the most: they stay the same whatever becomes of the generator. CAMPAIGN counts the campaigns there
+ * have been; what was played in a former one is forgotten.
  */
 private const val LEVELS = 50
+private const val CAMPAIGN = 2
 
 private val RULES = listOf(
     "The numbers give how many walls their row or column holds.",
@@ -174,6 +186,13 @@ class MainActivity : ComponentActivity() {
         Comfort.calm = prefs.getBoolean("calm", still)
         Comfort.plainDigits = prefs.getBoolean("plainDigits", false)
         Comfort.magnifier = prefs.getBoolean("magnifier", true)
+        if (prefs.getInt("campaign", 1) < CAMPAIGN) {
+            // Levels solved or begun in the former campaign would land on grids they were never played on.
+            val editor = prefs.edit().putInt("campaign", CAMPAIGN)
+            for (key in prefs.all.keys) if (Regex("(done|marks)\\d+_\\d+").matches(key)) editor.remove(key)
+            if (prefs.getString("last", "")!!.startsWith("C:")) editor.remove("last")
+            editor.apply()
+        }
         val campaign = resources.openRawResource(R.raw.campaign).bufferedReader().use { it.readLines() }.map { decodePuzzle(it)!! }
             .groupBy { it.width }
         setContent {
@@ -208,6 +227,9 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
     var size by rememberSaveable { mutableIntStateOf(0) } // difficulty chosen in Campaign or Endless, 0 while choosing
     var level by rememberSaveable { mutableIntStateOf(0) } // campaign level on screen, 0 for the table of levels
+    // What Endless digs: a size, kept apart from [size] while it is being chosen, and an index in REASONINGS.
+    var endlessSize by rememberSaveable { mutableIntStateOf(prefs.getInt("endlessSize", 8).takeIf { it in SIZES } ?: 8) }
+    var reasoning by rememberSaveable { mutableIntStateOf(prefs.getInt("reasoning", 1).coerceIn(REASONINGS.indices)) }
     val toMenu = { screen = Screen.MENU }
     val inGrid = screen == Screen.TUTORIAL || (screen == Screen.ENDLESS && size != 0) || (screen == Screen.CAMPAIGN && level != 0)
     LaunchedEffect(inGrid) { audio.setMenu(!inGrid) }
@@ -227,7 +249,7 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
             val lastLevel = last.getOrNull(2)?.toIntOrNull()?.takeIf { it in 1..LEVELS }
             val resume = when {
                 lastSize == null -> null
-                last[0] == "E" -> "Endless · ${difficulty(lastSize)}"
+                last[0] == "E" -> "Endless · $lastSize×$lastSize · ${REASONINGS[reasoning]}"
                 last[0] == "C" && lastLevel != null -> "${difficulty(lastSize)} · Level $lastLevel"
                 else -> null
             }
@@ -247,9 +269,25 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
             Campaign(prefs, audio, campaign.getValue(size), size, level, { level = it }) { size = 0 }
         }
         Screen.ENDLESS -> if (size == 0) {
-            Difficulties("Endless", toMenu, { "$it×$it" }, { false }) { size = it }
+            Page("Endless", toMenu, spider = true) {
+                Text("Size", color = Dim)
+                Planks {
+                    for (s in SIZES) PlankButton("$s×$s", selected = s == endlessSize) {
+                        endlessSize = s
+                        prefs.edit().putInt("endlessSize", s).apply()
+                    }
+                }
+                Text("Reasoning", color = Dim)
+                Planks {
+                    for ((index, name) in REASONINGS.withIndex()) PlankButton(name, selected = index == reasoning) {
+                        reasoning = index
+                        prefs.edit().putInt("reasoning", index).apply()
+                    }
+                }
+                Plank("Enter", "$endlessSize×$endlessSize · ${REASONINGS[reasoning]}", matter = Matter.GILDED) { size = endlessSize }
+            }
         } else {
-            Endless(prefs, audio, size) { size = 0 }
+            Endless(prefs, audio, size, reasoning) { size = 0 }
         }
         Screen.TUTORIAL -> Tutorial(prefs, toMenu) { size = 0; level = 0; screen = Screen.CAMPAIGN }
         Screen.OPTIONS -> Options(prefs, audio, toMenu)
@@ -266,6 +304,7 @@ private fun Menu(solved: Int, finished: Int, tutorialDone: Boolean, resume: Stri
     // How far the sign comes down to hang right over the arch, whatever room the entrance was given.
     var drop by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
+    val activity = LocalActivity.current
     Box(
         Modifier.fillMaxSize().drawBehind {
             // A dungeon wall in the dark: staggered stone blocks.
@@ -309,7 +348,10 @@ private fun Menu(solved: Int, finished: Int, tutorialDone: Boolean, resume: Stri
                     }
                     Plank("Endless", modifier = Modifier.weight(1f).fillMaxHeight()) { open(Screen.ENDLESS) }
                 }
-                Plank("Options", matter = Matter.IRON) { open(Screen.OPTIONS) }
+                Row(Modifier.widthIn(max = 320.dp).fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Plank("Options", modifier = Modifier.weight(1f).fillMaxHeight(), matter = Matter.IRON) { open(Screen.OPTIONS) }
+                    Plank("Quit", modifier = Modifier.weight(1f).fillMaxHeight(), matter = Matter.IRON) { activity?.finish() }
+                }
             }
             Spider()
         }
@@ -367,8 +409,10 @@ private val LURKERS = listOf(
 private fun Entrance(modifier: Modifier) {
     val torch = torchFrames()
     val tick = rememberTick()
+    val clock = rememberClock()
     Canvas(modifier) {
         if (size.height < 1f) return@Canvas
+        val time = clock.value
         val (width, height) = arch(size.width, size.height)
         val left = (size.width - width) / 2
         val top = size.height - height
@@ -383,11 +427,13 @@ private fun Entrance(modifier: Modifier) {
         }
         val torchSize = width * 0.34f
         val flames = listOf(left - stones - torchSize * 0.6f, left + width + stones + torchSize * 0.6f).map { Offset(it, spring) }
-        // The light follows the flame: each of its frames has its own, barely different, brightness.
-        val frames = flames.indices.map { (tick.value / 2 + it) % torch.size }
+        val frames = flames.indices.map { (tick.value + it * 2) % torch.size }
         for ((index, flame) in flames.withIndex()) {
-            val glow = 0.42f * listOf(1f, 0.95f, 0.97f)[frames[index]]
-            drawCircle(Brush.radialGradient(listOf(Color(0xFFF08A2A).copy(alpha = glow), Color.Transparent), flame, width * 1.1f), width * 1.1f, flame)
+            // The light wavers with the flame, never twice the same: two beats that drift apart.
+            val waver = 1f + 0.07f * sin(time * 9f + index * 2f) * sin(time * 3.7f + index)
+            val reach = width * 1.1f * waver
+            drawCircle(Brush.radialGradient(listOf(Color(0xFFF08A2A).copy(alpha = 0.42f * waver), Color.Transparent), flame, reach), reach, flame)
+            drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE066).copy(alpha = 0.3f * waver), Color.Transparent), flame, width * 0.3f), width * 0.3f, flame)
         }
         // The stones of the arch, then their joints; the dark covers the inner half of the stroke.
         drawPath(opening, Color(0xFF6E6A86), style = Stroke(stones * 2))
@@ -411,6 +457,12 @@ private fun Entrance(modifier: Modifier) {
         }
         for ((index, flame) in flames.withIndex()) {
             translate(flame.x - torchSize / 2, flame.y - torchSize * 0.25f) { with(torch[frames[index]]) { draw(Size(torchSize, torchSize)) } }
+            // Sparks rise from the flame and die out, one after the other.
+            if (!Comfort.calm) for (spark in 0..3) {
+                val life = (time * 0.4f + spark * 0.27f + index * 0.5f).mod(1f)
+                val sway = sin(spark * 7f + life * 6f) * torchSize * 0.16f
+                drawCircle(Color(0xFFFFB347).copy(alpha = 1f - life), torchSize * 0.022f, flame + Offset(sway, -torchSize * (0.15f + life * 1.1f)))
+            }
         }
     }
 }
@@ -662,50 +714,52 @@ private fun LevelTile(number: Int, done: String?, begun: Boolean, size: Int, onC
     }
 }
 
-private fun endlessSeed(prefs: SharedPreferences, size: Int) =
-    if (prefs.contains("seed$size")) prefs.getLong("seed$size", 0) else Random.nextLong()
+private fun endlessSeed(prefs: SharedPreferences, slot: String) =
+    if (prefs.contains("seed$slot")) prefs.getLong("seed$slot", 0) else Random.nextLong()
 
-/** Random grids of one [size], one after the other. */
+/** Random grids of one [size] and one [reasoning] of REASONINGS, one after the other until the player walks out. */
 @Composable
-private fun Endless(prefs: SharedPreferences, audio: Audio, size: Int, onBack: () -> Unit) {
-    var seed by remember { mutableLongStateOf(endlessSeed(prefs, size)) }
+private fun Endless(prefs: SharedPreferences, audio: Audio, size: Int, reasoning: Int, onBack: () -> Unit) {
+    // What the grid under way is saved as. The middle one keeps the name grids had before there was a choice, and the grid begun then.
+    val slot = if (reasoning == 1) "$size" else "${size}r$reasoning"
+    var seed by remember { mutableLongStateOf(endlessSeed(prefs, slot)) }
     var solvedCount by remember { mutableIntStateOf(prefs.getInt("solved", 0)) }
-    val status = "${difficulty(size)} · $solvedCount solved"
+    val status = "$size×$size · ${REASONINGS[reasoning]} · $solvedCount solved"
     // One grid: leaving it (the next grid, the way back) cancels its digging.
     key(seed) {
         // The grid itself is saved next to its seed, so a save never depends on the generator giving it again.
         var puzzle by remember {
-            mutableStateOf(prefs.getString("puzzleE$size", "")!!.takeIf { it.startsWith("$seed;") }?.let { decodePuzzle(it.substringAfter(';')) })
+            mutableStateOf(prefs.getString("puzzleE$slot", "")!!.takeIf { it.startsWith("$seed;") }?.let { decodePuzzle(it.substringAfter(';')) })
         }
         var failed by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
-            prefs.edit().putLong("seed$size", seed).putString("last", "E:$size").apply()
+            prefs.edit().putLong("seed$slot", seed).putString("last", "E:$size").apply()
             if (puzzle != null) return@LaunchedEffect
-            val dug = withContext(Dispatchers.Default) { generate(size, size, seed) { !isActive } }
+            val dug = withContext(Dispatchers.Default) { generate(size, size, seed, reasoning = probesOf(size, reasoning)) { !isActive } }
             if (dug == null) {
                 failed = true
             } else {
-                prefs.edit().putString("puzzleE$size", "$seed;${dug.encode()}").apply()
+                prefs.edit().putString("puzzleE$slot", "$seed;${dug.encode()}").apply()
                 puzzle = dug
             }
         }
         val p = puzzle
         if (p != null) {
             Game(
-                prefs, audio, "Endless", onBack, back = "Difficulty",
-                puzzle = p, saveKey = "marksE$size", legacyId = "$seed",
+                prefs, audio, "Endless", onBack, back = "Choose",
+                puzzle = p, saveKey = "marksE$slot", legacyId = "$seed",
                 variety = seed.toInt(), status = status, solvedStatus = { status },
-                next = "Next grid", onNext = { seed = Random.nextLong() }, skip = "New grid",
+                next = "Next grid", onNext = { seed = Random.nextLong() }, skip = "New grid", auto = true,
                 // A grid counts the moment it is solved, and only once however often it is solved again.
                 onSolved = {
-                    if (!prefs.contains("counted$size") || prefs.getLong("counted$size", 0) != seed) {
+                    if (!prefs.contains("counted$slot") || prefs.getLong("counted$slot", 0) != seed) {
                         solvedCount++
-                        prefs.edit().putInt("solved", solvedCount).putLong("counted$size", seed).apply()
+                        prefs.edit().putInt("solved", solvedCount).putLong("counted$slot", seed).apply()
                     }
                 },
             )
         } else {
-            Page("Endless", onBack, back = "Difficulty", foot = {}) {
+            Page("Endless", onBack, back = "Choose", foot = {}) {
                 Text(status, color = Dim)
                 Column(
                     Modifier.fillMaxWidth().aspectRatio(1f),
@@ -731,6 +785,7 @@ private fun Diggers() {
     val torch = torchFrames()
     val bodies = monsterBodies()
     val tick = rememberTick()
+    val clock = rememberClock()
     val wave = if (Comfort.calm) {
         null
     } else {
@@ -744,11 +799,11 @@ private fun Diggers() {
             // Each one leaves the ground for a fifth of the loop, in turn.
             val turn = wave?.let { (it.value * dwellers.size - index).mod(dwellers.size.toFloat()) } ?: 1f
             val hop = if (kind != null && turn < 1f) sin(PI.toFloat() * turn) * cell * 0.3f else 0f
-            translate(index * cell, size.height - cell - hop) {
+            translate(index * cell, size.height - cell) {
                 if (kind == null) {
-                    with(torch[(tick.value / 2) % torch.size]) { draw(Size(cell, cell)) }
+                    with(torch[tick.value % torch.size]) { draw(Size(cell, cell)) }
                 } else {
-                    drawMonster(kind, bodies, tick.value, index, cell)
+                    drawMonster(kind, bodies, tick.value, index, cell, clock.value, hop)
                 }
             }
         }
@@ -762,7 +817,7 @@ private fun Diggers() {
  * offered once solved; [skip], when given, names a plank over the grid that leaves it unsolved for
  * the next one. [status] is shown above the grid, and [solvedStatus] under the announcement once it is solved.
  *
- * With the help turned on in Options, a Check plank crosses the marks that are wrong for a second,
+ * With the help turned on in Options, a Check plank crosses the marks that are wrong for three seconds,
  * then rests for a minute.
  */
 @Composable
@@ -781,11 +836,12 @@ private fun Game(
     next: String,
     onNext: () -> Unit,
     skip: String? = null,
+    auto: Boolean = false,
     onSolved: (picture: String) -> Unit,
 ) {
     val session = remember(puzzle) { Session(puzzle, prefs.getString(saveKey, null), legacyId) }
     val haptics = remember { prefs.getBoolean("haptics", true) }
-    val ruleHint = remember { prefs.getBoolean("ruleHint", false) }
+    val ruleHint = remember { prefs.getBoolean("ruleHint", true) }
     val help = remember { prefs.getBoolean("help", false) }
     val brush = remember { mutableIntStateOf(prefs.getInt("brush", 0)) }
     // What the player is asked to confirm, by the name of its plank: [skip] or Reset. Empty for nothing.
@@ -796,9 +852,9 @@ private fun Game(
     var checked by remember(session) { mutableStateOf(false) }
     LaunchedEffect(checked) {
         if (!checked) return@LaunchedEffect
-        delay(1_000)
+        delay(3_000)
         wrong = null
-        delay(59_000)
+        delay(57_000)
         checked = false
     }
     val haptic = LocalHapticFeedback.current
@@ -809,6 +865,13 @@ private fun Game(
         onDispose { view.keepScreenOn = false }
     }
     LaunchedEffect(session) { if (session.solved) onSolved(session.picture()) }
+    // The time to see the dungeon finished, then on to the next one. Not in calm mode, where nothing moves on its own.
+    LaunchedEffect(session.solved) {
+        if (auto && session.solved && !Comfort.calm) {
+            delay(2_500)
+            onNext()
+        }
+    }
 
     /** Wraps a button's action: a click, and the save. */
     fun act(action: () -> Unit) = {
@@ -999,8 +1062,8 @@ private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) 
             Spacer(Modifier.height(8.dp))
             PrefToggle(prefs, "haptics", "Vibrate on every mark")
             PrefToggle(prefs, "keepScreenOn", "Keep the screen on while playing")
-            PrefToggle(prefs, "ruleHint", "Say when every count is met but a rule is broken", default = false)
-            PrefToggle(prefs, "help", "Help: a Check plank under the grid shows the wrong marks for a second, once a minute", default = false)
+            PrefToggle(prefs, "ruleHint", "Say when every count is met but a rule is broken")
+            PrefToggle(prefs, "help", "Help: a Check plank under the grid shows the wrong marks for three seconds, once a minute", default = false)
             PrefToggle(prefs, "magnifier", "Magnifier under the finger on large grids") { Comfort.magnifier = it }
             PrefToggle(prefs, "plainDigits", "Plain digits for the wall counts", Comfort.plainDigits) { Comfort.plainDigits = it }
             PrefToggle(prefs, "calm", "Calm mode: nothing moves on its own", Comfort.calm) { Comfort.calm = it }

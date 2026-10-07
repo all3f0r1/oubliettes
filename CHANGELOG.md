@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.7
+
+Settings, Endless grids and their count are kept. **The campaign is a new one**: the levels solved
+or begun in the campaign of 0.6.3 are forgotten, since they would land on grids they were never
+played on.
+
+### Added
+
+- Endless asks for two things on one screen, a **size** from 6×6 to 14×14 and how much **reasoning**
+  its grids take: **Gentle**, **Tricky** or **Fiendish**, by how often solving them takes trying a
+  cell both ways. Each size has its own measure of the three, and each pair keeps its grid under way.
+- In Endless the next grid comes by itself once one is solved, until you walk out. In calm mode the
+  planks stay and nothing moves on its own.
+- **Quit** on the menu, next to Options.
+
+### Changed
+
+- The campaign has 250 new grids. In each difficulty the levels go from the one that asks for the
+  least reasoning to the one that asks for the most, and every one of them can be solved without a
+  guess: 15 grids of the former Medium and Hard could not.
+- The dungeon has more to look at. Open cells are paved, walls shade the floor under them and
+  monsters and chests cast a shadow; monsters breathe, each at its own pace, and those that fly
+  drift; every sprite has its shade and its glint, walls come in five kinds and the torch flame in
+  six frames. On the menu the light of the torches wavers and sparks rise from them.
+- The first difficulty is **Novice**, no longer Baby.
+- Being told when every count is met but a rule is broken is on by default. Those who set the option
+  keep their choice.
+- **Check** shows the wrong marks for three seconds, no longer one.
+- The screenshots are those of this version.
+
 ## 0.6.3
 
 Saves, solved levels and settings of 0.6.2 are kept.

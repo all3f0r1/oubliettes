@@ -93,6 +93,15 @@ internal fun rememberTick(): State<Int> = produceState(0, Comfort.calm) {
     }
 }
 
+/** Seconds gone by, for the motions worked out while drawing: a step every 66 ms, none in calm mode. Read it while drawing. */
+@Composable
+internal fun rememberClock(): State<Float> = produceState(0f, Comfort.calm) {
+    while (!Comfort.calm) {
+        delay(66)
+        value += 0.066f
+    }
+}
+
 /** What a sign is made of, which tells what it is for: [ink] is its lettering. */
 internal enum class Matter(val fill: List<Color>, val rim: Color, val ink: Color) {
     /** Somewhere to go. */

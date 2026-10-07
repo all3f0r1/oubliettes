@@ -3,12 +3,12 @@
 A logic puzzle game for Android: work out where the dungeon walls are from the clues.
 
 <p align="center">
-  <img src="metadata/en-US/images/phoneScreenshots/1-menu.png" width="190" alt="Main menu: a torch-lit dungeon wall with Continue, Campaign, Endless, Tutorial and Options" />
-  <img src="metadata/en-US/images/phoneScreenshots/2-game.png" width="190" alt="An 8×8 grid in progress: walls, dots, monsters, a chest, the wall counts, and the Undo, Redo and Reset planks" />
-  <img src="metadata/en-US/images/phoneScreenshots/3-solved.png" width="190" alt="A solved grid, all counts green and underlined, with Play again and Next level" />
+  <img src="metadata/en-US/images/phoneScreenshots/1-menu.png" width="190" alt="Main menu: a torch-lit dungeon entrance with eyes in the dark, and the Tutorial, Continue, Campaign, Endless, Options and Quit planks" />
+  <img src="metadata/en-US/images/phoneScreenshots/2-game.png" width="190" alt="An 8×8 grid in progress: walls, hallway dots, monsters, a chest, the wall counts, and the Wall, Hallway, undo, redo and Checkpoint planks" />
+  <img src="metadata/en-US/images/phoneScreenshots/3-solved.png" width="190" alt="A solved grid, the whole dungeon paved and every count struck through, with Play again and Next level" />
   <img src="metadata/en-US/images/phoneScreenshots/4-tutorial.png" width="190" alt="Tutorial step about monsters and dead ends, with two cells left for the player to mark" />
   <img src="metadata/en-US/images/phoneScreenshots/5-options.png" width="190" alt="Options: sound and music sliders, vibration, screen, magnifier, plain digits and calm mode" />
-  <img src="metadata/en-US/images/phoneScreenshots/6-levels.png" width="190" alt="Campaign: the table of levels, the solved one showing its dungeon, the next one marked as begun" />
+  <img src="metadata/en-US/images/phoneScreenshots/6-levels.png" width="190" alt="Campaign: the table of levels, the solved one showing its dungeon, another marked as begun" />
 </p>
 
 ## Rules
@@ -20,7 +20,7 @@ A logic puzzle game for Android: work out where the dungeon walls are from the c
 - Outside treasure rooms, hallways are one cell wide (no open 2×2 block).
 - All open cells are connected.
 
-Every grid has exactly one solution. Newly generated grids (Endless, and the Baby and Leeroy levels) can
+Every grid has exactly one solution. Newly generated grids (Endless, and the Novice and Leeroy levels) can
 be solved without a guess: at most by trying a cell both ways and seeing one break a rule. Generated grids also never have walls more than two cells thick
 (no 3×3 block of walls), which you can use as a clue.
 
@@ -50,13 +50,16 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
 
 ## Modes
 
-- **Campaign**: five difficulties, Baby (6×6), Easy (8×8), Medium (10×10), Hard (12×12) and Leeroy
+- **Campaign**: five difficulties, Novice (6×6), Easy (8×8), Medium (10×10), Hard (12×12) and Leeroy
   (14×14), with 50 levels each. The 250 grids ship with the app, so level *n* is the same grid for
-  everyone and stays the same from one version to the next. You pick a difficulty, which shows how
+  everyone and stays the same from one version to the next. In each difficulty the levels go from
+  the one that asks for the least reasoning to the one that asks for the most. You pick a difficulty, which shows how
   many of its levels are solved and bears a seal once they all are, then a level. All levels are
   open from the start; the table of levels shows which ones are begun, and a small picture of each
   dungeon you solved.
-- **Endless**: randomly generated grids in the difficulty you pick first. A grid counts as solved the moment it
+- **Endless**: randomly generated grids of the size and of the reasoning you pick first: Gentle, Tricky or
+  Fiendish, by how often solving them takes trying a cell both ways. Once a grid is solved the next one comes by itself, until you
+  walk out. A grid counts as solved the moment it
   is, once; a new one comes after that. **New grid** leaves a grid you do not want to finish, and
   asks first when it has marks, since they are lost. Digging stops as soon as you leave, and gives up (offering
   another grid) rather than search forever.
@@ -70,10 +73,10 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 ## Options
 
 - Vibration on every mark, and keeping the screen on while a grid is shown.
-- Being told when every count is met but a rule is broken (off by default; it never says which rule
+- Being told when every count is met but a rule is broken (on by default; it never says which rule
   or where).
 - Help (off by default): a **Check** plank under the grid crosses out the marks that are wrong for
-  a second, then rests for a minute.
+  three seconds, then rests for a minute.
 - The magnifier on large grids.
 - Plain digits for the wall counts, instead of the calligraphic ones.
 - Calm mode: monsters, chests, torches and the spider stop moving. It starts on when the system

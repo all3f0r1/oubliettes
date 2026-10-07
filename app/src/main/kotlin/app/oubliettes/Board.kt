@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -61,11 +62,15 @@ internal val Gold = Color(0xFFE0B84C)
 internal val Red = Color(0xFFFF6B57)
 private val Unknown = Color(0xFF24222D)
 internal val OpenFloor = Color(0xFF3D3A4E)
+private val Joint = Color(0xFF312E40) // between the flagstones of an open floor
+private val Shade = Color(0x47000000) // what stands above the floor darkens it
+private val Vignette = Color(0x2E000000)
 
 /**
  * A monster sprite: two body [frames] drawn without eyes, and where its [eyes] go, in the 24-unit
  * viewport of the drawables. The eyes are drawn on top so they can blink and look around.
- * [bob] is how far down the eyes sit on the second frame.
+ * [bob] is how far down the eyes sit on the second frame. One that [flies] drifts over the floor
+ * instead of standing on it.
  */
 internal class Monster(
     val frames: List<Int>,
@@ -75,6 +80,7 @@ internal class Monster(
     val pupil: Color,
     val lid: Color,
     val bob: Float = 0f,
+    val flies: Boolean = false,
 )
 
 internal val MONSTERS = listOf(
@@ -84,7 +90,7 @@ internal val MONSTERS = listOf(
     ),
     Monster(
         listOf(R.drawable.monster_ghost_0, R.drawable.monster_ghost_1), listOf(Offset(9.3f, 10.3f), Offset(14.7f, 10.3f)), 1.9f,
-        ball = Color(0xFF24222D), pupil = Color(0xFF7CE8FF), lid = Color(0xFFDCD8F0),
+        ball = Color(0xFF24222D), pupil = Color(0xFF7CE8FF), lid = Color(0xFFDCD8F0), flies = true,
     ),
     Monster(
         listOf(R.drawable.monster_imp_0, R.drawable.monster_imp_1), listOf(Offset(9.6f, 10.2f), Offset(14.4f, 10.2f)), 1.5f,
@@ -96,20 +102,22 @@ internal val MONSTERS = listOf(
     ),
     Monster(
         listOf(R.drawable.monster_bat_0, R.drawable.monster_bat_1), listOf(Offset(10.6f, 12.3f), Offset(13.4f, 12.3f)), 1.1f,
-        ball = Color(0xFFFFE066), pupil = Bg, lid = Color(0xFF3F6FD0),
+        ball = Color(0xFFFFE066), pupil = Bg, lid = Color(0xFF3F6FD0), flies = true,
     ),
     Monster(
         listOf(R.drawable.monster_eye_0, R.drawable.monster_eye_1), listOf(Offset(12f, 12.5f)), 4.5f,
-        ball = Color.White, pupil = Color(0xFF8A1020), lid = Color(0xFFF09A3A),
+        ball = Color.White, pupil = Color(0xFF8A1020), lid = Color(0xFFF09A3A), flies = true,
     ),
 )
 
 @Composable
 internal fun monsterBodies(): List<List<Painter>> = MONSTERS.map { monster -> monster.frames.map { painterResource(it) } }
 
+/** In the order the flame goes through them: it leans one way, stretches, leans the other, shrinks. */
 @Composable
 internal fun torchFrames(): List<Painter> =
-    listOf(R.drawable.torch_0, R.drawable.torch_1, R.drawable.torch_2).map { painterResource(it) }
+    listOf(R.drawable.torch_0, R.drawable.torch_1, R.drawable.torch_3, R.drawable.torch_2, R.drawable.torch_5, R.drawable.torch_4)
+        .map { painterResource(it) }
 
 /** The first frame is the bare chest; a glint crosses it on the next three. */
 @Composable
@@ -126,11 +134,55 @@ internal fun eyeState(tick: Int, index: Int) = when ((tick + index * 13) % 47) {
     else -> Eye.OPEN
 }
 
-/** Draws monster number [kind] of [MONSTERS] in a square of side [cell]. [index] staggers its animation. */
-internal fun DrawScope.drawMonster(kind: Int, bodies: List<List<Painter>>, tick: Int, index: Int, cell: Float) {
-    val frame = (tick / 3 + index) % 2
-    with(bodies[kind][frame]) { draw(Size(cell, cell)) }
-    drawEyes(MONSTERS[kind], tick, index, cell, frame)
+/** The shadow of what stands in a square of side [cell], smaller the further it is [lift]ed off the floor. */
+internal fun DrawScope.drawShadow(cell: Float, lift: Float = 0f) {
+    val width = cell * 0.58f - lift
+    drawOval(Shade, Offset((cell - width) / 2, cell * 0.83f), Size(width, cell * 0.12f))
+}
+
+/**
+ * Draws monster number [kind] of [MONSTERS] in a square of side [cell], [lift]ed that far off its
+ * floor. [index] staggers its animation. As [time] goes by it breathes, and drifts when it flies.
+ */
+internal fun DrawScope.drawMonster(kind: Int, bodies: List<List<Painter>>, tick: Int, index: Int, cell: Float, time: Float = 0f, lift: Float = 0f) {
+    val monster = MONSTERS[kind]
+    // Each one at its own pace, so that no two keep moving together. Its second frame is a gesture
+    // of half a second, every three seconds or so.
+    val pace = 0.75f + (index * 5 % 7) * 0.09f
+    val frame = if ((tick + index * 11) % (17 + index * 5 % 9) < 3) 1 else 0
+    val drift = if (monster.flies) cell * 0.025f * (1f + sin(time * 1.5f * pace + index * 2.3f)) else 0f
+    // Wider as it gets shorter, its feet where they were: barely, it only has to look alive.
+    val swell = 0.018f * sin(time * 1.9f * pace + index * 1.7f)
+    drawShadow(cell, lift + drift)
+    translate(0f, -lift - drift) {
+        scale(1f + swell, 1f - swell, Offset(cell / 2, cell * 0.92f)) {
+            with(bodies[kind][frame]) { draw(Size(cell, cell)) }
+            drawEyes(monster, tick, index, cell, frame)
+        }
+    }
+}
+
+/**
+ * The flagstones of an open cell at [left], [top]: one of four layings, by its [seed]. Then the shade
+ * of the walls standing right [above] it and on its left ([beside]), which is what gives them height.
+ */
+private fun DrawScope.drawFloor(seed: Int, left: Float, top: Float, cell: Float, paved: Boolean, above: Boolean, beside: Boolean) {
+    val joint = cell * 0.035f
+    fun across(y: Float, from: Float = 0f, to: Float = 1f) =
+        drawLine(Joint, Offset(left + 1 + (cell - 2) * from, top + cell * y), Offset(left + 1 + (cell - 2) * to, top + cell * y), joint)
+    fun down(x: Float, from: Float = 0f, to: Float = 1f) =
+        drawLine(Joint, Offset(left + cell * x, top + 1 + (cell - 2) * from), Offset(left + cell * x, top + 1 + (cell - 2) * to), joint)
+    if (paved) when (seed.mod(4)) {
+        0 -> { across(0.5f); down(0.36f, to = 0.5f); down(0.66f, from = 0.5f) }
+        1 -> { down(0.5f); across(0.38f, to = 0.5f); across(0.64f, from = 0.5f) }
+        2 -> { across(0.62f); down(0.55f, from = 0.62f) }
+        else -> { across(0.34f); down(0.42f, to = 0.34f) }
+    }
+    if (above) {
+        drawRect(Shade, Offset(left + 1, top + 1), Size(cell - 2, cell * 0.12f))
+        drawRect(Shade, Offset(left + 1, top + 1), Size(cell - 2, cell * 0.26f))
+    }
+    if (beside) drawRect(Shade, Offset(left + 1, top + 1), Size(cell * 0.1f, cell - 2))
 }
 
 /** The eyes of a [monster] where its body would have them. [lurking] in the dark, there is no body: a blink shows nothing. */
@@ -194,10 +246,14 @@ internal fun Board(
     val marks = session.marks
     // Mostly plain bricks, so the odd cracked or mossy one reads as detail rather than noise.
     val plain = painterResource(R.drawable.wall)
-    val walls = listOf(plain, plain, plain, painterResource(R.drawable.wall_cracked), plain, plain, painterResource(R.drawable.wall_mossy))
+    val walls = listOf(
+        plain, painterResource(R.drawable.wall_worn), plain, painterResource(R.drawable.wall_cracked),
+        plain, painterResource(R.drawable.wall_chipped), painterResource(R.drawable.wall_mossy),
+    )
     val chest = chestFrames()
     val bodies = monsterBodies()
     val tick = rememberTick()
+    val clock = rememberClock()
     val monsterOrder = p.monsters.sorted() // neighbouring monsters get different faces
     val measurer = rememberTextMeasurer()
     val currentPaint by rememberUpdatedState(onPaint)
@@ -305,6 +361,7 @@ internal fun Board(
 
             val t = beat?.value ?: 0f
             val frame = tick.value
+            val time = clock.value
             for (i in marks.indices) {
                 val left = (i % p.width + 1) * cell
                 val top = (i / p.width + 1) * cell
@@ -315,22 +372,40 @@ internal fun Board(
                 if (lit != null && (i / p.width == lit / p.width || i % p.width == lit % p.width)) {
                     drawRect(band, Offset(left + 1, top + 1), Size(cell - 2, cell - 2))
                 }
+                if (marks[i] != WALL) {
+                    drawFloor(
+                        i * 7 + variety, left, top, cell, paved = floor == OpenFloor,
+                        above = i >= p.width && marks[i - p.width] == WALL, beside = i % p.width > 0 && marks[i - 1] == WALL,
+                    )
+                }
                 // Celebration: monsters hop one after the other, chests pulse.
                 val moving = beat != null && marks[i] != WALL
                 when {
                     marks[i] == WALL -> translate(left, top) { with(walls[(i * 5 + variety).mod(walls.size)]) { draw(Size(cell, cell)) } }
                     i in p.chests -> translate(left, top) {
+                        drawShadow(cell)
                         val pulse = if (moving) 1f + 0.1f * sin(2 * PI.toFloat() * t) else 1f
-                        scale(pulse, Offset(cell / 2, cell / 2)) { with(chest[(frame / 2 + i).mod(chest.size)]) { draw(Size(cell, cell)) } }
+                        // A glint crosses the chest every five seconds, each chest in its turn.
+                        val glint = (frame + i * 13) % 34
+                        scale(pulse, Offset(cell / 2, cell / 2)) { with(chest[if (glint < 3) glint + 1 else 0]) { draw(Size(cell, cell)) } }
                     }
                     i in p.monsters -> {
                         val order = monsterOrder.indexOf(i)
                         val hop = if (moving) abs(sin(PI.toFloat() * (t + order * 0.37f))) * cell * 0.16f else 0f
-                        translate(left, top - hop) { drawMonster((order + variety).mod(MONSTERS.size), bodies, frame, order, cell) }
+                        translate(left, top) { drawMonster((order + variety).mod(MONSTERS.size), bodies, frame, order, cell, time, hop) }
                     }
                 }
                 if (marks[i] == KNOWN_OPEN && !celebrate) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))
             }
+            // The light does not reach the far corners of the dungeon.
+            val grid = Size(p.width * cell, p.height * cell)
+            drawRect(
+                Brush.radialGradient(
+                    0.55f to Color.Transparent, 1f to Vignette,
+                    center = Offset(cell + grid.width / 2, cell + grid.height / 2), radius = grid.maxDimension * 0.72f,
+                ),
+                Offset(cell, cell), grid,
+            )
             for (i in wrong) {
                 val a = Offset((i % p.width + 1) * cell, (i / p.width + 1) * cell) + Offset(cell * 0.2f, cell * 0.2f)
                 val reach = cell * 0.6f
