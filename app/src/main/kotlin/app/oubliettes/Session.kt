@@ -22,10 +22,13 @@ private const val HISTORY = 50
  * of [dragTo], then [end]. [saved] is what [save] returned earlier; it is ignored unless it was made
  * for this exact puzzle. [legacyId] is what saves of 0.4 were tagged with instead: the seed.
  *
+ * With [completes], a row or a column the player marks is finished for them once its unknown cells
+ * can only be filled one way: all open when it has its walls, all walls when it needs every one of them.
+ *
  * A [checkpoint] remembers the marks before the player tries something out, when deduction runs dry;
  * [toCheckpoint] brings back the latest one. They pile up, one per try within a try.
  */
-internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: String? = null) {
+internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: String? = null, private val completes: Boolean = false) {
     private val width = puzzle.width
     private val cells = width * puzzle.height
 
@@ -59,6 +62,9 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     private var alongRow: Boolean? = null
     private var last = 0
     private var repaint = emptySet<Int>()
+
+    /** The cells the latest action filled by itself, see [complete]. */
+    private var filled = emptySet<Int>()
 
     init {
         fun snapshot(text: String) = text.takeIf { it.length == cells && it.all { c -> c in '0'..'2' } }
@@ -108,7 +114,8 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     fun begin(cell: Int, brush: Int = 0): Boolean {
         if (given(cell)) return false
         // The cells the previous action changed: this stroke may paint over those.
-        repaint = undone.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet()
+        // Not those it filled by itself, though: the player did not lay them, and a drag leaves them be.
+        repaint = (undone.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet()) - filled
         record()
         first = cell
         value = when {
@@ -117,7 +124,13 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
             else -> brush
         }
         alongRow = null
-        marks = marks.copyOf().also { it[cell] = value }
+        // Mending the previous action takes back what it filled: a wall on its way to a dot in the
+        // cycle may have finished a line that the dot does not.
+        val mended = if (cell in repaint) filled else emptySet()
+        marks = marks.copyOf().also { new ->
+            mended.forEach { new[it] = 0 }
+            new[cell] = value
+        }
         return true
     }
 
@@ -154,6 +167,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     /** Ends the stroke: only now is the grid checked. True when this stroke solved it. */
     fun end(): Boolean {
         val before = solved
+        filled = if (completes) complete() else emptySet()
         settle()
         // A solved grid has nothing left to take back, and its history would only weigh on the saves.
         if (solved) {
@@ -162,6 +176,41 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
             checkpoints.clear()
         }
         return solved && !before
+    }
+
+    /**
+     * Finishes the rows and the columns of the cells this action marked, then those of the cells that
+     * filled, and so on. Erasing a mark finishes nothing, or the cell would fill again at once.
+     * Returns the cells it filled.
+     */
+    private fun complete(): Set<Int> {
+        val before = undone.lastOrNull() ?: return emptySet()
+        val new = marks.copyOf()
+        val done = mutableSetOf<Int>()
+        val queue = ArrayDeque(marks.indices.filter { marks[it] != 0 && marks[it] != before[it] })
+        while (queue.isNotEmpty()) {
+            val cell = queue.removeFirst()
+            val x = cell % width
+            val y = cell / width
+            val lines = listOf(
+                (0 until width).map { y * width + it } to puzzle.rowCounts[y],
+                (0 until puzzle.height).map { it * width + x } to puzzle.colCounts[x],
+            )
+            for ((line, count) in lines) {
+                val unknown = line.filter { new[it] == 0 && !given(it) }
+                val walls = line.count { new[it] == WALL }
+                val value = when (count) {
+                    walls -> KNOWN_OPEN
+                    walls + unknown.size -> WALL
+                    else -> continue
+                }
+                unknown.forEach { new[it] = value }
+                done += unknown
+                queue += unknown
+            }
+        }
+        if (done.isNotEmpty()) marks = new
+        return done
     }
 
     /** Sets [targets] to [value] as one action. For the tutorial and the accessibility actions. */
@@ -176,6 +225,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
 
     fun undo() {
         if (!canUndo) return
+        filled = emptySet()
         redone += marks
         marks = undone.removeAt(undone.lastIndex)
         settle()
@@ -183,6 +233,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
 
     fun redo() {
         if (!canRedo) return
+        filled = emptySet()
         undone += marks
         marks = redone.removeAt(redone.lastIndex)
         settle()
@@ -195,6 +246,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     /** Back to the latest checkpoint, which is used up. An action like any other: Undo brings the try back. */
     fun toCheckpoint() {
         if (!canReturn) return
+        filled = emptySet()
         record()
         marks = checkpoints.removeAt(checkpoints.lastIndex)
         settle()

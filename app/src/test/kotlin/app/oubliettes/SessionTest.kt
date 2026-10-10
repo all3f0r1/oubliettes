@@ -92,6 +92,44 @@ class SessionTest {
     }
 
     @Test
+    fun aLineLeftOneWayIsFinished() {
+        val s = Session(tutorialPuzzle, completes = true)
+        // Row 2 has its wall, so column 5 needs all of its cells, so does row 5, and so on.
+        s.tap(c(5, 2))
+        assertEquals(listOf("000101", "202101", "222221", "000101", "022221", "111111"), (0..5).map { s.row(it) })
+        s.undo() // what filled by itself belongs to the tap
+        assertTrue(s.marks.all { it == 0 })
+        assertFalse(s.canUndo)
+
+        s.tap(c(5, 2))
+        s.tap(c(5, 2)) // the wall was on its way to a dot: what it filled goes with it
+        assertEquals("000002", s.row(2))
+        assertEquals(1, s.marks.count { it != 0 })
+    }
+
+    @Test
+    fun finishedCellsAreNotDraggedOverAndCanBeErased() {
+        val s = Session(tutorialPuzzle, completes = true)
+        s.tap(c(5, 2))
+        s.begin(c(0, 0), WALL)
+        s.dragTo(0, 5)
+        s.end()
+        assertEquals("the dots that filled by themselves stay", "122101", s.column(0))
+        assertEquals("row 0 has its walls", "122121", s.row(0))
+        s.tap(c(1, 0)) // a dot back to unknown: it does not fill again
+        assertEquals("102121", s.row(0))
+    }
+
+    @Test
+    fun aLineFinishedMaySolve() {
+        val s = Session(tutorialPuzzle, completes = true)
+        val walls = tutorialSolution.indices.filter { tutorialSolution[it] }
+        // Rows 2 and 4 fill with dots, which leaves column 3 a single cell for its last wall.
+        assertTrue(s.paint(walls - c(3, 0), WALL))
+        assertEquals("...###.C.#M#.....#####.#M....#######", s.picture())
+    }
+
+    @Test
     fun countsMetIsNotSolved() {
         val s = Session(tutorialPuzzle)
         assertFalse("an empty grid breaks no rule yet", s.ruleBroken)

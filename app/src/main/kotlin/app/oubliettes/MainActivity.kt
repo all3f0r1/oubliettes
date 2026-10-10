@@ -839,7 +839,7 @@ private fun Game(
     auto: Boolean = false,
     onSolved: (picture: String) -> Unit,
 ) {
-    val session = remember(puzzle) { Session(puzzle, prefs.getString(saveKey, null), legacyId) }
+    val session = remember(puzzle) { Session(puzzle, prefs.getString(saveKey, null), legacyId, prefs.getBoolean("complete", true)) }
     val haptics = remember { prefs.getBoolean("haptics", true) }
     val ruleHint = remember { prefs.getBoolean("ruleHint", true) }
     val help = remember { prefs.getBoolean("help", false) }
@@ -1062,6 +1062,7 @@ private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) 
             Spacer(Modifier.height(8.dp))
             PrefToggle(prefs, "haptics", "Vibrate on every mark")
             PrefToggle(prefs, "keepScreenOn", "Keep the screen on while playing")
+            PrefToggle(prefs, "complete", "Finish a row or a column once it can only be filled one way")
             PrefToggle(prefs, "ruleHint", "Say when every count is met but a rule is broken")
             PrefToggle(prefs, "help", "Help: a Check plank under the grid shows the wrong marks for three seconds, once a minute", default = false)
             PrefToggle(prefs, "magnifier", "Magnifier under the finger on large grids") { Comfort.magnifier = it }

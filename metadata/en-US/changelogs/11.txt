@@ -1,0 +1,2 @@
+- A row or a column you mark is finished by itself once it can only be filled one way; an option turns it off
+- Saves of 0.7 are kept

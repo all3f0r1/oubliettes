@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1
+
+Saves, solved levels and settings of 0.7 are kept.
+
+### Added
+
+- A row or a column you mark is **finished by itself** once its unknown cells can only be filled one
+  way: all open when it has its walls, all walls when it needs every one of them. The lines this
+  fills are finished in turn. It is one action with the mark that set it off, and an option turns
+  it off. The tutorial does not do it: its steps teach those very deductions.
+
 ## 0.7
 
 Settings, Endless grids and their count are kept. **The campaign is a new one**: the levels solved
