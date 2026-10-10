@@ -17,9 +17,9 @@ Repo: https://github.com/all3f0r1/oubliettes.git
 Binaries: https://github.com/all3f0r1/oubliettes/releases/download/%v/oubliettes-%v.apk
 
 Builds:
-  - versionName: '0.5'
-    versionCode: 5
-    commit: 3f0ba022e40fb64a770c5d8786d8a0a7278cc10a
+  - versionName: 0.7.3
+    versionCode: 13
+    commit: 8843702a82cfbd3228ad6354ffb8c807a33689c4
     subdir: app
     gradle:
       - yes
@@ -28,5 +28,5 @@ AllowedAPKSigningKeys: 0091bd59aefaeff4a4f75fb25ecd2866ea80c812036ba39288fa5abb7
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '0.5'
-CurrentVersionCode: 5
+CurrentVersion: 0.7.3
+CurrentVersionCode: 13
