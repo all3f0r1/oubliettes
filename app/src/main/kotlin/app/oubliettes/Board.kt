@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
-import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.sin
 
 internal val Bg = Color(0xFF1B1A22)
@@ -143,21 +143,28 @@ internal fun DrawScope.drawShadow(cell: Float, lift: Float = 0f) {
 /**
  * Draws monster number [kind] of [MONSTERS] in a square of side [cell], [lift]ed that far off its
  * floor. [index] staggers its animation. As [time] goes by it breathes, and drifts when it flies.
+ * On the [alert] it is ready to strike whoever comes near: reared up, shaking, its gesture over and
+ * over, lunging now and then, and its eyes never leave you.
  */
-internal fun DrawScope.drawMonster(kind: Int, bodies: List<List<Painter>>, tick: Int, index: Int, cell: Float, time: Float = 0f, lift: Float = 0f) {
+internal fun DrawScope.drawMonster(
+    kind: Int, bodies: List<List<Painter>>, tick: Int, index: Int, cell: Float, time: Float = 0f, lift: Float = 0f, alert: Boolean = false,
+) {
     val monster = MONSTERS[kind]
     // Each one at its own pace, so that no two keep moving together. Its second frame is a gesture
     // of half a second, every three seconds or so.
     val pace = 0.75f + (index * 5 % 7) * 0.09f
-    val frame = if ((tick + index * 11) % (17 + index * 5 % 9) < 3) 1 else 0
+    val frame = if (alert) (tick + index) % 2 else if ((tick + index * 11) % (17 + index * 5 % 9) < 3) 1 else 0
     val drift = if (monster.flies) cell * 0.025f * (1f + sin(time * 1.5f * pace + index * 2.3f)) else 0f
     // Wider as it gets shorter, its feet where they were: barely, it only has to look alive.
     val swell = 0.018f * sin(time * 1.9f * pace + index * 1.7f)
+    // A lunge is short and comes back slowly; the shaking never stops.
+    val lunge = if (alert) 0.12f + 0.14f * sin(time * 2.6f * pace + index * 1.9f).coerceAtLeast(0f).pow(6) else 0f
+    val shake = if (alert) cell * 0.025f * sin(time * 31f + index * 2.1f) else 0f
     drawShadow(cell, lift + drift)
-    translate(0f, -lift - drift) {
-        scale(1f + swell, 1f - swell, Offset(cell / 2, cell * 0.92f)) {
+    translate(shake, -lift - drift) {
+        scale(1f + swell + lunge, 1f - swell + lunge, Offset(cell / 2, cell * 0.92f)) {
             with(bodies[kind][frame]) { draw(Size(cell, cell)) }
-            drawEyes(monster, tick, index, cell, frame)
+            drawEyes(monster, tick, index, cell, frame, alert = alert)
         }
     }
 }
@@ -185,11 +192,15 @@ private fun DrawScope.drawFloor(seed: Int, left: Float, top: Float, cell: Float,
     if (beside) drawRect(Shade, Offset(left + 1, top + 1), Size(cell * 0.1f, cell - 2))
 }
 
-/** The eyes of a [monster] where its body would have them. [lurking] in the dark, there is no body: a blink shows nothing. */
-internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: Float, frame: Int = 0, lurking: Boolean = false) {
+/**
+ * The eyes of a [monster] where its body would have them. [lurking] in the dark, there is no body: a blink shows nothing.
+ * On the [alert] they stare without a blink, the pupils thin and the brows low.
+ */
+internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: Float, frame: Int = 0, lurking: Boolean = false, alert: Boolean = false) {
     val unit = cell / 24
     val r = monster.radius * unit
-    val state = eyeState(tick, index)
+    val state = if (alert) Eye.OPEN else eyeState(tick, index)
+    val slit = if (alert) 0.4f else 0.7f
     if (lurking && state == Eye.BLINK) return
     for (eye in monster.eyes) {
         val centre = Offset(eye.x, eye.y + frame * monster.bob) * unit
@@ -204,14 +215,14 @@ internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: F
                 else -> 0f
             }
             // Slit pupil, like a snake's.
-            drawOval(monster.pupil, centre + Offset(look - r * 0.35f, -r * 0.8f), Size(r * 0.7f, r * 1.6f))
+            drawOval(monster.pupil, centre + Offset(look - r * slit / 2, -r * 0.8f), Size(r * slit, r * 1.6f))
         }
         // A frown: each brow slants down towards the middle of the face and cuts into the eye.
         if (monster.eyes.size > 1) {
             val inward = if (eye.x < 12) 1f else -1f
             drawLine(
-                Bg, centre + Offset(-inward * r * 1.3f, -r * 1.7f), centre + Offset(inward * r * 1.1f, -r * 0.6f),
-                unit * 0.9f, StrokeCap.Round,
+                Bg, centre + Offset(-inward * r * 1.3f, -r * 1.7f), centre + Offset(inward * r * 1.1f, -r * if (alert) 0.2f else 0.6f),
+                unit * if (alert) 1.4f else 0.9f, StrokeCap.Round,
             )
         }
     }
@@ -224,7 +235,7 @@ internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: F
  * is called every time cells were painted, [onStroke] once the stroke is over, with whether it solved
  * the grid. [variety] picks which monsters and wall tiles a grid shows; [focus] cells get a gold
  * outline, and those among them still [toMark] are said so to screen readers. [wrong] cells are
- * crossed in red. [celebrate] shows the finished dungeon: no dots, monsters hopping, chest pulsing.
+ * crossed in red. [celebrate] shows the finished dungeon: no dots, monsters on the alert, chest pulsing.
  *
  * The grid is one drawing, so every count and every cell is doubled by an invisible node that
  * describes it to accessibility services and lets them mark it.
@@ -378,7 +389,7 @@ internal fun Board(
                         above = i >= p.width && marks[i - p.width] == WALL, beside = i % p.width > 0 && marks[i - 1] == WALL,
                     )
                 }
-                // Celebration: monsters hop one after the other, chests pulse.
+                // Celebration: monsters stand on the alert, chests pulse.
                 val moving = beat != null && marks[i] != WALL
                 when {
                     marks[i] == WALL -> translate(left, top) { with(walls[(i * 5 + variety).mod(walls.size)]) { draw(Size(cell, cell)) } }
@@ -391,8 +402,7 @@ internal fun Board(
                     }
                     i in p.monsters -> {
                         val order = monsterOrder.indexOf(i)
-                        val hop = if (moving) abs(sin(PI.toFloat() * (t + order * 0.37f))) * cell * 0.16f else 0f
-                        translate(left, top) { drawMonster((order + variety).mod(MONSTERS.size), bodies, frame, order, cell, time, hop) }
+                        translate(left, top) { drawMonster((order + variety).mod(MONSTERS.size), bodies, frame, order, cell, time, alert = celebrate) }
                     }
                 }
                 if (marks[i] == KNOWN_OPEN && !celebrate) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))

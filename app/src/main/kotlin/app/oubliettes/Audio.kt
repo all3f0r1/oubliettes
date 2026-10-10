@@ -20,9 +20,6 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
-
-private enum class Source { NONE, MENU, LOOP }
-
 /** A decoded sound: [size] bytes of 16-bit samples. */
 private class Pcm(val bytes: ByteArray, val size: Int, val rate: Int, val channels: Int)
 
@@ -76,7 +73,7 @@ private fun decode(context: Context, resource: Int): Pcm? = runCatching {
 /**
  * A bundled loop played without a seam: decoded whole, then written round and round to an audio
  * track by a thread of its own. MediaPlayer's looping leaves a gap every time it starts over.
- * Decoded loops stay in [cache]: going back and forth between the menu and a grid decodes nothing.
+ * Decoded loops stay in [cache]: starting over after a silence decodes nothing.
  */
 private class Loop(context: Context, resource: Int, attributes: AudioAttributes, cache: ConcurrentHashMap<Int, Pcm>) {
     @Volatile private var track: AudioTrack? = null
@@ -124,7 +121,7 @@ private class Loop(context: Context, resource: Int, attributes: AudioAttributes,
 }
 
 /**
- * Sound effects plus background music: the bundled loops (a calmer one for the menus).
+ * Sound effects plus background music: one bundled loop, the same on every screen.
  * The music holds the audio focus while it plays. It stays silent when another app is already
  * playing, stops when another app takes the focus, and comes back when the focus does.
  */
@@ -139,12 +136,14 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     private val pool = SoundPool.Builder().setMaxStreams(4).setAudioAttributes(attributes).build()
     val click = pool.load(context, R.raw.sfx_click, 1)
     private val victory = pool.load(context, R.raw.sfx_victory, 1)
+    private val roars = listOf(
+        R.raw.sfx_roar_0, R.raw.sfx_roar_1, R.raw.sfx_roar_2, R.raw.sfx_roar_3, R.raw.sfx_roar_4,
+        R.raw.sfx_roar_5, R.raw.sfx_roar_6, R.raw.sfx_roar_7, R.raw.sfx_roar_8, R.raw.sfx_roar_9,
+    ).map { pool.load(context, it, 1) }
 
     private var loop: Loop? = null // a bundled loop
     private val decoded = ConcurrentHashMap<Int, Pcm>()
-    private var source = Source.NONE
     private var foreground = false
-    private var menu = true
     private var hushed = false
     private val handler = Handler(Looper.getMainLooper())
 
@@ -172,16 +171,16 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
         if (v > 0) pool.play(sound, v, v, 1, 0, 1f)
     }
 
-    /** Plays the victory jingle, with the music silenced while it lasts. */
+    /** Plays the victory jingle and the cry of a monster, another one from grid to grid. The music stops until [resume]. */
     fun victory() {
         play(victory)
+        play(roars.random())
         hushed = true
         sync()
-        handler.removeCallbacks(unhush)
-        handler.postDelayed(unhush, 3500)
     }
 
-    private val unhush = Runnable {
+    /** The music comes back after [victory]: call when the solved grid leaves the screen. */
+    fun resume() {
         hushed = false
         sync()
     }
@@ -195,12 +194,6 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
     /** Music only plays while the app is on screen. */
     fun setForeground(value: Boolean) {
         foreground = value
-        sync()
-    }
-
-    /** Menus get their own shorter, calmer loop. */
-    fun setMenu(value: Boolean) {
-        menu = value
         sync()
     }
 
@@ -221,21 +214,11 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
             // Another app playing keeps the floor: asking for the focus would stop it.
             focused = manager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         }
-        val want = when {
-            !wanted || !focused || paused -> Source.NONE
-            menu -> Source.MENU
-            else -> Source.LOOP
-        }
-        if (want != source) {
+        val playing = wanted && focused && !paused && !hushed
+        if (playing != (loop != null)) {
             loop?.stop()
-            source = want
-            loop = when (want) {
-                Source.MENU -> Loop(context, R.raw.menu, attributes, decoded)
-                Source.LOOP -> Loop(context, R.raw.music, attributes, decoded)
-                Source.NONE -> null
-            }
+            loop = if (playing) Loop(context, R.raw.music, attributes, decoded) else null
         }
-        val v = if (hushed) 0f else musicVolume * musicVolume
-        loop?.volume = v
+        loop?.volume = musicVolume * musicVolume
     }
 }

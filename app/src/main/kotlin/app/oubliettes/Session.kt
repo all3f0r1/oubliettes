@@ -22,8 +22,9 @@ private const val HISTORY = 50
  * of [dragTo], then [end]. [saved] is what [save] returned earlier; it is ignored unless it was made
  * for this exact puzzle. [legacyId] is what saves of 0.4 were tagged with instead: the seed.
  *
- * With [completes], a row or a column the player marks is finished for them once its unknown cells
- * can only be filled one way: all open when it has its walls, all walls when it needs every one of them.
+ * With [completes], the row and the column of the cell the player marked last are finished for them
+ * once their unknown cells can only be filled one way: all open when the line has its walls, all walls
+ * when it needs every one of them.
  *
  * A [checkpoint] remembers the marks before the player tries something out, when deduction runs dry;
  * [toCheckpoint] brings back the latest one. They pile up, one per try within a try.
@@ -62,6 +63,9 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     private var alongRow: Boolean? = null
     private var last = 0
     private var repaint = emptySet<Int>()
+
+    /** The cell the player marked last: its row and its column are the ones [complete] may finish. */
+    private var latest = 0
 
     /** The cells the latest action filled by itself, see [complete]. */
     private var filled = emptySet<Int>()
@@ -118,6 +122,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         repaint = (undone.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet()) - filled
         record()
         first = cell
+        latest = cell
         value = when {
             brush == 0 -> (marks[cell] + 1) % 3
             marks[cell] == brush -> 0
@@ -152,10 +157,12 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         val to = if (row) x else y
         val new = marks.copyOf()
         var painted = 0
-        for (step in minOf(last, to)..maxOf(last, to)) {
+        // The way the finger went: the cell painted last is the one it reached.
+        for (step in if (to >= last) last..to else last downTo to) {
             val target = if (row) firstY * width + step else step * width + firstX
             if (new[target] != value && (new[target] == 0 || target in repaint) && !given(target)) {
                 new[target] = value
+                latest = target
                 painted++
             }
         }
@@ -179,35 +186,30 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     }
 
     /**
-     * Finishes the rows and the columns of the cells this action marked, then those of the cells that
-     * filled, and so on. Erasing a mark finishes nothing, or the cell would fill again at once.
+     * Finishes the row and the column of the cell marked last, and no other: the lines this fills are
+     * left to the player. Erasing a mark finishes nothing, or the cell would fill again at once.
      * Returns the cells it filled.
      */
     private fun complete(): Set<Int> {
-        val before = undone.lastOrNull() ?: return emptySet()
+        if (marks[latest] == 0) return emptySet()
         val new = marks.copyOf()
         val done = mutableSetOf<Int>()
-        val queue = ArrayDeque(marks.indices.filter { marks[it] != 0 && marks[it] != before[it] })
-        while (queue.isNotEmpty()) {
-            val cell = queue.removeFirst()
-            val x = cell % width
-            val y = cell / width
-            val lines = listOf(
-                (0 until width).map { y * width + it } to puzzle.rowCounts[y],
-                (0 until puzzle.height).map { it * width + x } to puzzle.colCounts[x],
-            )
-            for ((line, count) in lines) {
-                val unknown = line.filter { new[it] == 0 && !given(it) }
-                val walls = line.count { new[it] == WALL }
-                val value = when (count) {
-                    walls -> KNOWN_OPEN
-                    walls + unknown.size -> WALL
-                    else -> continue
-                }
-                unknown.forEach { new[it] = value }
-                done += unknown
-                queue += unknown
+        val x = latest % width
+        val y = latest / width
+        val lines = listOf(
+            (0 until width).map { y * width + it } to puzzle.rowCounts[y],
+            (0 until puzzle.height).map { it * width + x } to puzzle.colCounts[x],
+        )
+        for ((line, count) in lines) {
+            val unknown = line.filter { new[it] == 0 && !given(it) }
+            val walls = line.count { new[it] == WALL }
+            val value = when (count) {
+                walls -> KNOWN_OPEN
+                walls + unknown.size -> WALL
+                else -> continue
             }
+            unknown.forEach { new[it] = value }
+            done += unknown
         }
         if (done.isNotEmpty()) marks = new
         return done
@@ -216,7 +218,10 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     /** Sets [targets] to [value] as one action. For the tutorial and the accessibility actions. */
     fun paint(targets: Collection<Int>, value: Int): Boolean {
         val new = marks.copyOf()
-        for (cell in targets) if (!given(cell)) new[cell] = value
+        for (cell in targets) if (!given(cell) && new[cell] != value) {
+            new[cell] = value
+            latest = cell
+        }
         if (new.contentEquals(marks)) return false
         record()
         marks = new

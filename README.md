@@ -34,9 +34,10 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   cells, plus the cells of your previous action (drag again over a drag to fix it). Older marks are
   never overwritten. However fast the finger goes, every cell it crosses is filled, and only the
   finger that started a drag draws.
-- A row or a column you mark is finished for you once its unknown cells can only be filled one way:
-  all open when it has its walls, all walls when it needs every one of them. The lines this fills
-  are finished in turn, and the whole of it is one action for Undo. Erasing a mark finishes nothing.
+- The row and the column of the cell you marked last are finished for you once their unknown cells
+  can only be filled one way: all open when the line has its walls, all walls when it needs every one
+  of them. The lines this fills are left to you, and the whole of it is one action for Undo. Erasing
+  a mark finishes nothing.
 - The two arrows under the grid undo the last action (a whole drag counts as one) and redo it.
   The round arrow over the grid resets it after asking, and is an action like any other: Undo restores the marks.
   The last 50 actions of every unfinished grid are kept, even after leaving the app.
@@ -76,7 +77,7 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 ## Options
 
 - Vibration on every mark, and keeping the screen on while a grid is shown.
-- Finishing a row or a column once it can only be filled one way (on by default).
+- Finishing the row and the column marked last once they can only be filled one way (on by default).
 - Being told when every count is met but a rule is broken (on by default; it never says which rule
   or where).
 - Help (off by default): a **Check** plank under the grid crosses out the marks that are wrong for
@@ -101,10 +102,12 @@ screens, large fonts), and calm mode stops all motion.
 
 Options has volume sliders for sound effects and music. The music holds the audio focus while it
 plays: it stays silent when another app is already playing (your own music or a podcast keeps
-going), stops when another app starts, and comes back afterwards. The music is a bundled 80-second medieval loop, with
-a shorter and calmer 24-second one for the menus, both played from memory so that they loop without a gap. The app never uses the network.
+going), stops when another app starts, and comes back afterwards. The music is a bundled 80-second medieval loop,
+the same on every screen and never cut from one to the next, played from memory so that it loops without a gap.
+A solved grid stops it: a monster cries out, one of ten cries, and the music comes back with the next screen.
+The app never uses the network.
 
-The loops and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).
+The loop and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).
 
 ## Install
 

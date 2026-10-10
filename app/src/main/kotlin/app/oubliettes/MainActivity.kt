@@ -231,8 +231,6 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
     var endlessSize by rememberSaveable { mutableIntStateOf(prefs.getInt("endlessSize", 8).takeIf { it in SIZES } ?: 8) }
     var reasoning by rememberSaveable { mutableIntStateOf(prefs.getInt("reasoning", 1).coerceIn(REASONINGS.indices)) }
     val toMenu = { screen = Screen.MENU }
-    val inGrid = screen == Screen.TUTORIAL || (screen == Screen.ENDLESS && size != 0) || (screen == Screen.CAMPAIGN && level != 0)
-    LaunchedEffect(inGrid) { audio.setMenu(!inGrid) }
     // One step back at a time: the level, its table, the difficulties, the menu.
     BackHandler(enabled = screen != Screen.MENU) {
         when {
@@ -865,6 +863,8 @@ private fun Game(
         onDispose { view.keepScreenOn = false }
     }
     LaunchedEffect(session) { if (session.solved) onSolved(session.picture()) }
+    // The music a solved grid stopped comes back with the next screen, whichever it is.
+    DisposableEffect(session) { onDispose { audio.resume() } }
     // The time to see the dungeon finished, then on to the next one. Not in calm mode, where nothing moves on its own.
     LaunchedEffect(session.solved) {
         if (auto && session.solved && !Comfort.calm) {
@@ -900,7 +900,7 @@ private fun Game(
         foot = {
             if (session.solved) {
                 Planks {
-                    PlankButton("Play again", onClick = act(session::reset))
+                    PlankButton("Play again", onClick = act { session.reset(); audio.resume() })
                     PlankButton(next, onClick = onNext)
                 }
             } else {

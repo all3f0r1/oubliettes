@@ -8,10 +8,11 @@ strings with nothing above 5 kHz, a quiet recorder melody that rests for a third
 percussion, and 80 seconds before anything repeats. Note tails and reverb wrap around the end, so
 the loop point is seamless.
 
-The main menu has its own loop: shorter and calmer, the lute alone over the drone.
+The cries of the monsters (sfx_roar_0 to sfx_roar_9) are a rough voice through a throat: one of them
+is played when a grid is solved.
 
-Names given as arguments (music, menu, sfx_click, sfx_victory) limit what is written; the default is
-everything.
+Names given as arguments (music, sfx_click, sfx_victory, sfx_roar_0...) limit what is written; the
+default is everything.
 """
 import pathlib
 import subprocess
@@ -121,31 +122,6 @@ def music():
     return stereo / np.abs(stereo).max() * 0.5
 
 
-def menu():
-    """Menu loop: 24 seconds, one slow lute note per beat over the drone, no melody."""
-    beat = 1.0
-    chords = [DM, DM, F, C, DM, AM, C, DM]
-    n = round(len(chords) * 3 * beat * SR)
-    own = np.random.default_rng(11)  # its own generator: adding this loop must not change the others
-    lute = np.zeros(n)
-    for bar, (bass, fifth, octave, third) in enumerate(chords):
-        notes = [(0, bass, 1.0), (1, fifth, 0.5), (2, third if bar % 2 else octave, 0.55)]
-        for at, note, vel in notes:
-            add(lute, (bar * 3 + at) * beat + own.normal(0, 0.006), pluck(note, dur=3.6, vel=vel * own.uniform(0.85, 1.0)))
-
-    t = np.arange(n) / SR
-    loop = n / SR
-    drone = sum(
-        amp * np.sin(2 * np.pi * round(hz(m) * loop) / loop * t)
-        for m, amp in ((38, 1.0), (45, 0.6))
-    ) * (0.8 + 0.2 * np.sin(2 * np.pi * 2 / loop * t))
-
-    dry = 0.5 * lute + 0.06 * drone
-    left = 0.65 * dry + 0.35 * reverb(dry, (1557, 1617, 1491, 1422))
-    right = 0.65 * dry + 0.35 * reverb(dry, (1580, 1640, 1514, 1445))
-    return np.stack([left, right], axis=1)
-
-
 def click():
     """Short and dry, pitched where phone speakers are at ease."""
     t = np.arange(int(0.03 * SR)) / SR
@@ -161,6 +137,44 @@ def victory():
         sig = pluck(note, dur=2.1)
         out[int(at * SR):][:len(sig)] += sig
     return out
+
+
+# One cry per line: pitch in Hz at its start, its peak and its end, seconds, how fast the voice
+# rattles in Hz, share of breath, and the resonances of the throat in Hz.
+ROARS = [
+    (90, 150, 60, 1.1, 34, 0.25, (450, 1100, 2400)),  # a big beast
+    (70, 110, 50, 1.4, 27, 0.20, (350, 900, 2200)),  # deeper and longer
+    (140, 230, 90, 0.8, 45, 0.30, (600, 1400, 2700)),  # a bark
+    (220, 420, 160, 0.7, 60, 0.35, (800, 1700, 3000)),  # a snarl
+    (500, 900, 380, 0.6, 75, 0.45, (1200, 2400, 3600)),  # a screech
+    (60, 85, 45, 1.3, 22, 0.15, (300, 750, 1900)),  # a growl that hardly rises
+    (110, 260, 70, 1.0, 38, 0.30, (500, 1250, 2600)),  # rising high, falling low
+    (320, 600, 240, 0.5, 90, 0.50, (1000, 2100, 3300)),  # a hiss of a shriek
+    (160, 200, 80, 0.9, 52, 0.25, (700, 1150, 2500)),  # a hoarse shout
+    (80, 180, 55, 1.2, 30, 0.40, (400, 1000, 2900)),  # breathy
+]
+
+
+def roar(index):
+    start, peak, end, dur, rattle, breath, throat = ROARS[index]
+    own = np.random.default_rng(100 + index)  # each cry its own generator: adding one changes no other
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    # The pitch climbs for a fifth of the cry, then sinks; it never holds still.
+    rise = 0.2 * dur
+    pitch = np.where(t < rise, start + (peak - start) * t / rise, peak + (end - peak) * np.clip((t - rise) / (dur - rise), 0, 1) ** 0.7)
+    wobble = np.cumsum(own.normal(0, 1, n))
+    pitch = pitch * (1 + 0.04 * wobble / np.abs(wobble).max())
+    phase = np.cumsum(pitch) / SR
+    voice = 2 * (phase % 1) - 1  # sawtooth: every harmonic, for the throat to pick from
+    voice += 0.6 * (2 * ((phase / 2) % 1) - 1)  # and the octave below, as vocal folds beating unevenly
+    voice *= 0.55 + 0.45 * np.sign(np.sin(2 * np.pi * rattle * t + own.uniform(0, 6)))
+    source = (1 - breath) * voice + breath * 2.5 * own.normal(0, 1, n)
+    # The throat, as bumps in the spectrum.
+    freqs = np.fft.rfftfreq(n, 1 / SR)
+    shape = sum(amp / (1 + ((freqs - f) / (0.12 * f)) ** 2) for f, amp in zip(throat, (1.0, 0.6, 0.3)))
+    out = np.fft.irfft(np.fft.rfft(source) * shape * (freqs < 6000), n)
+    return out * np.minimum(1, t / 0.05) * np.minimum(1, (dur - t) / (0.35 * dur)) ** 1.5
 
 
 def save(name, signal, peak):
@@ -182,7 +196,8 @@ def save(name, signal, peak):
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
-    sounds = {"music": (music, 0.5), "menu": (menu, 0.4), "sfx_click": (click, 0.4), "sfx_victory": (victory, 0.8)}
+    sounds = {"music": (music, 0.5), "sfx_click": (click, 0.4), "sfx_victory": (victory, 0.8)}
+    sounds.update({f"sfx_roar_{i}": (lambda i=i: roar(i), 0.7) for i in range(len(ROARS))})
     for name in sys.argv[1:] or sounds:
         make, peak = sounds[name]
         save(name, make(), peak)

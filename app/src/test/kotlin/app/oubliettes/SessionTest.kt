@@ -94,9 +94,9 @@ class SessionTest {
     @Test
     fun aLineLeftOneWayIsFinished() {
         val s = Session(tutorialPuzzle, completes = true)
-        // Row 2 has its wall, so column 5 needs all of its cells, so does row 5, and so on.
+        // Row 2 has its wall and column 5 needs all of its cells. Row 5 does too, but nobody marked it.
         s.tap(c(5, 2))
-        assertEquals(listOf("000101", "202101", "222221", "000101", "022221", "111111"), (0..5).map { s.row(it) })
+        assertEquals(listOf("000001", "000001", "222221", "000001", "000001", "000001"), (0..5).map { s.row(it) })
         s.undo() // what filled by itself belongs to the tap
         assertTrue(s.marks.all { it == 0 })
         assertFalse(s.canUndo)
@@ -114,18 +114,19 @@ class SessionTest {
         s.begin(c(0, 0), WALL)
         s.dragTo(0, 5)
         s.end()
-        assertEquals("the dots that filled by themselves stay", "122101", s.column(0))
-        assertEquals("row 0 has its walls", "122121", s.row(0))
-        s.tap(c(1, 0)) // a dot back to unknown: it does not fill again
-        assertEquals("102121", s.row(0))
+        assertEquals("the dot that filled by itself stays", "112101", s.column(0))
+        assertEquals("the row the drag ended on needs every cell", "111111", s.row(5))
+        assertEquals("not the rows it went through", "100001", s.row(3))
+        s.tap(c(1, 2)) // a dot back to unknown: it does not fill again
+        assertEquals("202221", s.row(2))
     }
 
     @Test
     fun aLineFinishedMaySolve() {
         val s = Session(tutorialPuzzle, completes = true)
         val walls = tutorialSolution.indices.filter { tutorialSolution[it] }
-        // Rows 2 and 4 fill with dots, which leaves column 3 a single cell for its last wall.
-        assertTrue(s.paint(walls - c(3, 0), WALL))
+        // The last wall laid is on row 5, which needs every one of its cells.
+        assertTrue(s.paint(walls - setOf(c(1, 5), c(2, 5)), WALL))
         assertEquals("...###.C.#M#.....#####.#M....#######", s.picture())
     }
 

@@ -1,0 +1,4 @@
+- Only the row and the column marked last are finished by themselves
+- The same music on every screen, without a cut from one to the next
+- On a solved grid the monsters stand on the alert, one of them cries out, and the music stops until the next screen
+- Saves of 0.7.1 are kept

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.2
+
+Saves, solved levels and settings of 0.7.1 are kept.
+
+### Added
+
+- Once a grid is solved, every monster stands **on the alert**, ready to strike whoever comes near:
+  reared up, shaking, lunging now and then, its eyes staring under lowered brows. In calm mode it
+  holds the pose without moving.
+- A monster **cries out** when a grid is solved: one of ten cries, another one from grid to grid.
+
+### Changed
+
+- Only the row and the column of the cell marked last are finished by themselves. The lines this
+  fills are no longer finished in turn: they are left to you.
+- The music of the grids plays **on every screen**, the menu included, and is no longer cut from
+  one screen to the next. The calmer loop of the menus is gone.
+- The music stops when a grid is solved, and comes back with the next screen: the menu, the next
+  grid, or the same one played again.
+- Monsters no longer hop on a solved grid.
+
 ## 0.7.1
 
 Saves, solved levels and settings of 0.7 are kept.
