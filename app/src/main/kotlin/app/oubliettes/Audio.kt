@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 /** A decoded sound: [size] bytes of 16-bit samples. */
 private class Pcm(val bytes: ByteArray, val size: Int, val rate: Int, val channels: Int)
@@ -171,10 +172,9 @@ class Audio(private val context: Context, private val prefs: SharedPreferences) 
         if (v > 0) pool.play(sound, v, v, 1, 0, 1f)
     }
 
-    /** Plays the victory jingle and the cry of a monster, another one from grid to grid. The music stops until [resume]. */
+    /** Plays the victory jingle one time in three, the cry of a monster the rest of the time, another one from grid to grid. The music stops until [resume]. */
     fun victory() {
-        play(victory)
-        play(roars.random())
+        play(if (Random.nextInt(3) == 0) victory else roars.random())
         hushed = true
         sync()
     }

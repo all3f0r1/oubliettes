@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.3
+
+Saves, solved levels and settings of 0.7.2 are kept.
+
+### Changed
+
+- A solved grid plays one sound, not two: the victory jingle one time in three, the cry of a
+  monster the rest of the time.
+
 ## 0.7.2
 
 Saves, solved levels and settings of 0.7.1 are kept.

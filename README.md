@@ -104,7 +104,8 @@ Options has volume sliders for sound effects and music. The music holds the audi
 plays: it stays silent when another app is already playing (your own music or a podcast keeps
 going), stops when another app starts, and comes back afterwards. The music is a bundled 80-second medieval loop,
 the same on every screen and never cut from one to the next, played from memory so that it loops without a gap.
-A solved grid stops it: a monster cries out, one of ten cries, and the music comes back with the next screen.
+A solved grid stops it: a monster cries out, one of ten cries, or one time in three the victory jingle plays instead,
+and the music comes back with the next screen.
 The app never uses the network.
 
 The loop and the sound effects are synthesised by `tools/make_audio.py` (needs numpy and ffmpeg).

@@ -1,0 +1,2 @@
+- A solved grid plays the victory jingle one time in three, the cry of a monster the rest of the time
+- Saves of 0.7.2 are kept
