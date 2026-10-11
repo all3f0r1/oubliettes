@@ -10,9 +10,26 @@ const val MAX_TRIES = 200
 private const val REPAIRS = 150
 
 /**
+ * How a dungeon is dug, which is what its grid is like to solve: one hallway is carried on for
+ * [straight] steps to every branch elsewhere, and [vaults] is how many more treasure rooms are tried.
+ */
+private enum class Shape(val straight: Int, val vaults: Int) {
+    MIXED(3, 0),
+
+    /** Long hallways: chains of deductions to follow. */
+    WINDING(11, 0),
+
+    /** Branches everywhere: dead ends, and their monsters, to reason on. */
+    BRANCHING(1, 0),
+
+    /** Treasure rooms to place, and their exits to find. */
+    VAULTS(3, 2),
+}
+
+/**
  * Deterministic: the same size and seed always give the same puzzle. It has exactly one solution,
- * which can be reached without a guess: see [stuck]. With [reasoning], only a grid whose [probes] are
- * in that range will do.
+ * which can be reached without a guess: see [stuck]. With [reasoning], only a grid whose [effort] is
+ * in that range will do. Each dungeon tried takes a shape of its own.
  * Null when [cancelled] answered true, or when [maxTries] dungeons were not enough.
  */
 fun generate(
@@ -21,7 +38,7 @@ fun generate(
     val rng = Random(seed xor (width.toLong() shl 32) xor (height.toLong() shl 48))
     repeat(maxTries) {
         if (cancelled()) return null
-        val (walls, chests) = carve(width, height, rng) ?: return@repeat
+        val (walls, chests) = carve(width, height, rng, Shape.entries.random(rng)) ?: return@repeat
         // A dungeon rarely gives a solvable grid as it comes, the less so the bigger it is, but most
         // of it does: rather than throw it away, change it where deduction gets stuck, and keep
         // every change that leaves no more cells stuck than before.
@@ -44,7 +61,7 @@ fun generate(
                 walls[cell] = !walls[cell]
             }
         }
-        if (left.isEmpty() && (reasoning == null || probes(p) in reasoning)) return p
+        if (left.isEmpty() && (reasoning == null || effort(steps(p)!!) in reasoning)) return p
     }
     return null
 }
@@ -67,7 +84,7 @@ internal fun clues(w: Int, h: Int, walls: BooleanArray, chests: Set<Int>): Puzzl
 }
 
 /** One random dungeon as a grid, whatever its number of solutions. Null when the attempt broke a rule. */
-internal fun layout(w: Int, h: Int, rng: Random): Puzzle? = carve(w, h, rng)?.let { (walls, chests) -> clues(w, h, walls, chests) }
+internal fun layout(w: Int, h: Int, rng: Random): Puzzle? = carve(w, h, rng, Shape.MIXED)?.let { (walls, chests) -> clues(w, h, walls, chests) }
 
 /** Top-left cell of a 3x3 block made only of walls, or null when no wall is more than two cells thick. */
 internal fun thickWall(walls: BooleanArray, w: Int, h: Int): Int? = walls.indices.firstOrNull { i ->
@@ -75,7 +92,7 @@ internal fun thickWall(walls: BooleanArray, w: Int, h: Int): Int? = walls.indice
 }
 
 /** Carves one random dungeon: its walls and its chests. Null when the attempt broke a rule. */
-private fun carve(w: Int, h: Int, rng: Random): Pair<BooleanArray, Set<Int>>? {
+private fun carve(w: Int, h: Int, rng: Random, shape: Shape): Pair<BooleanArray, Set<Int>>? {
     val walls = BooleanArray(w * h) { true }
     val frozen = BooleanArray(w * h) // room surroundings: stay walls, except each room's exit
     val chests = mutableSetOf<Int>()
@@ -84,7 +101,7 @@ private fun carve(w: Int, h: Int, rng: Random): Pair<BooleanArray, Set<Int>>? {
 
     val tops = mutableListOf<Pair<Int, Int>>()
     val exits = mutableListOf<Int>()
-    repeat(rng.nextInt(w * h / 32 + 1)) {
+    repeat(rng.nextInt(w * h / 32 + 1) + shape.vaults) {
         val tx = rng.nextInt(w - 2)
         val ty = rng.nextInt(h - 2)
         // Keep the 5x5 footprints apart so two rooms never share surrounding cells.
@@ -147,7 +164,7 @@ private fun carve(w: Int, h: Int, rng: Random): Pair<BooleanArray, Set<Int>>? {
         last = when {
             thick != null -> all.minBy { abs(it % w - thick % w) + abs(it / w - thick / w) }
             goal != null && rng.nextBoolean() -> all.minBy { abs(it % w - goal % w) + abs(it / w - goal / w) }
-            near.isNotEmpty() && rng.nextInt(4) != 0 -> near.random(rng)
+            near.isNotEmpty() && rng.nextInt(shape.straight + 1) != 0 -> near.random(rng)
             else -> all.random(rng)
         }
         walls[last] = false

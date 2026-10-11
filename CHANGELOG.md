@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.8
+
+Saves, solved levels and settings of 0.7.3 are kept. Endless grids under way are kept too; the ones
+dug from now on are measured and shaped anew.
+
+### Added
+
+- **Hints** that teach the reasoning. A **Hint** plank under the grid gives the plainest deduction
+  your marks allow, a word at a time: where to look, then why, then which cells, outlined in gold. It
+  stays until those cells are marked. When no rule gives a cell, it names the one to try and says
+  which rule the try breaks. With a wrong mark on the grid it says so, and shows it if asked. An
+  option turns the plank off.
+- The tutorial is a table of **lessons**: the basics, then treasure rooms, dead ends, narrow
+  hallways, the dungeon in one piece and trying a cell out. Each is a small dungeon solved one
+  deduction at a time, then one to solve on your own with the Hint plank at hand. A lesson bears a
+  seal once that second grid is solved.
+- **Daily**: one dungeon a day, dug from the date, so the same for every player on this version.
+  The last two weeks stay open and nothing is lost for a day missed.
+- **Share** on a solved grid sends what it was, how many hints it took and the grid itself, never
+  its solution. **Enter a code**, in Endless, digs the dungeon a friend sent: the whole message can
+  be pasted. A grid is taken only if reasoning alone solves it.
+- A **gallery**, in Endless, keeps the dungeons solved in Endless, in Daily and from a friend.
+- The campaign is told in **chapters** of ten levels, five to a difficulty, each with its name, its
+  count and a seal once mapped. The levels and their order are the same.
+- On grids with small cells, **two fingers spread the grid** and move it; the counts stay along the
+  edges, each in front of its row or its column.
+- The cells laid since the latest checkpoint bear a **parchment corner**: a try is told apart from
+  what is sure.
+- A tap on a count switches between plain and calligraphic digits.
+- An option keeps Endless from moving on to the next grid by itself.
+
+### Changed
+
+- Reasoning in Endless is measured by the deductions a grid takes, not only by how many cells have
+  to be tried: which rules, and how far a try has to be followed before it breaks one. Gentle,
+  Tricky and Fiendish each still take about a third of what is dug in a size.
+- Dungeons come in more shapes: long winding hallways, branches and their dead ends, or more
+  treasure rooms.
+- Should a campaign ever be replaced again, the dungeons solved in the former one go to the gallery.
+
 ## 0.7.3
 
 Saves, solved levels and settings of 0.7.2 are kept.

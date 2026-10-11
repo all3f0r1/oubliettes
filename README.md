@@ -49,6 +49,14 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
 - The row and the column of the cell touched last are lit up to their counts. On grids whose cells
   are smaller than a fingertip (10×10 and up on a phone), a magnifier shows what is under the
   finger.
+- **Hint** gives the plainest deduction your marks allow, a word at a time: where to look, then why,
+  then which cells, outlined in gold until they are marked. When no rule gives a cell it names the
+  one to try, and which rule the try breaks. With a wrong mark on the grid it only says so, and
+  shows it if asked.
+- The cells laid since the latest checkpoint bear a parchment corner: a try is told apart from what
+  is sure.
+- On grids with small cells, two fingers spread the grid and move it; the counts stay along the
+  edges. A tap on a count switches between plain and calligraphic digits.
 - **Rules**, under every grid, shows the rules without leaving it.
 - The grid and its planks rest on the bottom of the screen, under the thumb.
 
@@ -60,15 +68,23 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   the one that asks for the least reasoning to the one that asks for the most. You pick a difficulty, which shows how
   many of its levels are solved and bears a seal once they all are, then a level. All levels are
   open from the start; the table of levels shows which ones are begun, and a small picture of each
-  dungeon you solved.
+  dungeon you solved. Ten levels make a chapter, five to a difficulty, each with its name.
 - **Endless**: randomly generated grids of the size and of the reasoning you pick first: Gentle, Tricky or
-  Fiendish, by how often solving them takes trying a cell both ways. Once a grid is solved the next one comes by itself, until you
+  Fiendish, by the deductions solving them takes: which rules, how many cells have to be tried and how far each try has to be followed. Once a grid is solved the next one comes by itself, until you
   walk out. A grid counts as solved the moment it
   is, once; a new one comes after that. **New grid** leaves a grid you do not want to finish, and
   asks first when it has marks, since they are lost. Digging stops as soon as you leave, and gives up (offering
   another grid) rather than search forever.
-- **Tutorial**: a small dungeon solved one deduction at a time. You mark the cells of each step
-  yourself, or ask to be shown. Its sign bears a seal once you went through it.
+  Dungeons come in several shapes: winding hallways, branches and dead ends, or more treasure rooms.
+  **Gallery** keeps the dungeons solved in Endless, in Daily and from a friend. **Enter a code** digs
+  the dungeon a friend sent with **Share**, which a solved grid offers: what it was, how many hints
+  it took and the grid itself, never its solution.
+- **Daily**: one dungeon a day, dug from the date, so the same for every player on the same version
+  of the game. The last two weeks stay open, and a day missed costs nothing.
+- **Tutorial**: lessons, the basics first, then a technique each: treasure rooms, dead ends, narrow
+  hallways, the dungeon in one piece, trying a cell out. A lesson is a small dungeon solved one
+  deduction at a time, where you mark the cells of each step yourself or ask to be shown, then one
+  to solve on your own. Its sign bears a seal once you went through the basics.
 - **Continue**, on the main menu, reopens the grid you played last.
 
 Progress on every grid is saved after every action and restored on the next launch. A save holds a
@@ -80,6 +96,8 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 - Finishing the row and the column marked last once they can only be filled one way (on by default).
 - Being told when every count is met but a rule is broken (on by default; it never says which rule
   or where).
+- Hints (on by default): the **Hint** plank under the grid.
+- Endless moving on to the next grid by itself (on by default).
 - Help (off by default): a **Check** plank under the grid crosses out the marks that are wrong for
   three seconds, then rests for a minute.
 - The magnifier on large grids.
@@ -123,8 +141,8 @@ Requires JDK 21 and the Android SDK.
 ./gradlew testDebugUnitTest lintDebug
 ```
 
-The rules, the solver, the generator and the campaign file are tested in `GameTest`; drags, undo,
-redo, reset, checkpoints, the check and saves in `SessionTest`. `app/src/main/res/raw/campaign.txt` holds the campaign, one
+The rules, the solver and its explained deductions, the generator, the lessons and the campaign file are tested in `GameTest`; drags, undo,
+redo, reset, checkpoints, hints, the check and saves in `SessionTest`. `app/src/main/res/raw/campaign.txt` holds the campaign, one
 grid per line: it is frozen, a test fails if it changes.
 
 A signed release build needs the keystore at `release.jks` and its password:

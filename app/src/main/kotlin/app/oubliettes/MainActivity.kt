@@ -1,6 +1,5 @@
 package app.oubliettes
 
-import android.app.Activity
 import android.content.SharedPreferences
 import android.media.AudioManager
 import android.os.Bundle
@@ -8,149 +7,69 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import app.oubliettes.game.Puzzle
-import app.oubliettes.game.TutorialStep
 import app.oubliettes.game.decodePuzzle
-import app.oubliettes.game.generate
-import app.oubliettes.game.tutorialPuzzle
-import app.oubliettes.game.tutorialSteps
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.random.Random
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
 
-private val SIZES = listOf(6, 8, 10, 12, 14)
-private val DIFFICULTIES = listOf("Novice", "Easy", "Medium", "Hard", "Leeroy") // one per entry of SIZES
+internal val SIZES = listOf(6, 8, 10, 12, 14)
+internal val DIFFICULTIES = listOf("Novice", "Easy", "Medium", "Hard", "Leeroy") // one per entry of SIZES
 
-private fun difficulty(size: Int) = DIFFICULTIES[SIZES.indexOf(size)]
+internal fun difficulty(size: Int) = DIFFICULTIES[SIZES.indexOf(size)]
 
-// How much reasoning an Endless grid asks for. Larger grids take more [probes] whatever they are: each
+// How much reasoning an Endless grid asks for. Larger grids take more [effort] whatever they are: each
 // entry of SIZES has its own two cuts, where they leave about a third of what the generator digs on either side.
-private val REASONINGS = listOf("Gentle", "Tricky", "Fiendish")
-private val CUTS = listOf(1 to 3, 2 to 9, 15 to 25, 33 to 45, 51 to 62)
+internal val REASONINGS = listOf("Gentle", "Tricky", "Fiendish")
+private val CUTS = listOf(3 to 14, 54 to 138, 246 to 382, 477 to 657, 716 to 979)
 
-private fun probesOf(size: Int, reasoning: Int) = CUTS[SIZES.indexOf(size)].let { (tricky, fiendish) ->
+internal fun effortOf(size: Int, reasoning: Int) = CUTS[SIZES.indexOf(size)].let { (tricky, fiendish) ->
     listOf(0 until tricky, tricky until fiendish, fiendish..Int.MAX_VALUE)[reasoning]
 }
 
 /** Campaign levels of this [size] solved so far. */
-private fun SharedPreferences.solved(size: Int) = all.keys.count { it.startsWith("done${size}_") }
+internal fun SharedPreferences.solved(size: Int) = all.keys.count { it.startsWith("done${size}_") }
 
 /**
  * Campaign levels per difficulty. The grids are frozen in res/raw/campaign.txt, one per line, the
  * 50 of each size in turn, from the one that asks for the least reasoning to the one that asks for
- * the most: they stay the same whatever becomes of the generator. CAMPAIGN counts the campaigns there
- * have been; what was played in a former one is forgotten.
+ * the most: they stay the same whatever becomes of the generator. Ten levels make a chapter, named
+ * in CHAPTERS for each entry of SIZES. CAMPAIGN counts the campaigns there have been; the levels of a
+ * former one are no longer played, and the dungeons solved in it are kept in the gallery.
  */
-private const val LEVELS = 50
-private const val CAMPAIGN = 2
+internal const val LEVELS = 50
+internal const val CAMPAIGN = 2
+internal val CHAPTERS = listOf(
+    listOf("The Gatehouse", "The Guardroom", "The Kennels", "The Kitchens", "The Wine Cellar"),
+    listOf("The Dungeons", "The Cells", "The Well", "The Old Sewers", "The Rat Warren"),
+    listOf("The Crypts", "The Ossuary", "The Chapel Below", "The Tombs of the Kings", "The Sealed Vault"),
+    listOf("The King's Stores", "The Armoury", "The Treasury", "The Counting House", "The Hidden Hoard"),
+    listOf("The Forgotten Maze", "The Sunken Halls", "The Roots of the Keep", "The Black Pit", "The Oubliette"),
+)
 
-private val RULES = listOf(
+internal val RULES = listOf(
     "The numbers give how many walls their row or column holds.",
     "A number is dimmed and struck through once its count is reached, which does not prove the walls " +
         "are the right ones. It turns red and underlined when there are too many.",
@@ -164,12 +83,13 @@ private val RULES = listOf(
         "that mark at the first tap. Drag to fill a row or a column with what the first cell became; a " +
         "drag only fills blank cells and those of your previous action.",
     "When deduction runs dry and you must try something out, lay a Checkpoint first: Return brings " +
-        "the grid back to it if the try leads nowhere.",
+        "the grid back to it if the try leads nowhere. What was laid since bears a parchment corner.",
+    "On a grid with small cells, spread two fingers to see it larger, and move it with both. Tap a count for plain digits.",
 )
 
-private val StoneShade = ColorFilter.tint(Color(0xFF4A475C), BlendMode.Modulate)
+internal val StoneShade = ColorFilter.tint(Color(0xFF4A475C), BlendMode.Modulate)
 
-private enum class Screen { MENU, CAMPAIGN, ENDLESS, TUTORIAL, OPTIONS }
+internal enum class Screen { MENU, CAMPAIGN, ENDLESS, DAILY, SHARED, GALLERY, TUTORIAL, OPTIONS }
 
 class MainActivity : ComponentActivity() {
     private lateinit var audio: Audio
@@ -187,9 +107,12 @@ class MainActivity : ComponentActivity() {
         Comfort.plainDigits = prefs.getBoolean("plainDigits", false)
         Comfort.magnifier = prefs.getBoolean("magnifier", true)
         if (prefs.getInt("campaign", 1) < CAMPAIGN) {
-            // Levels solved or begun in the former campaign would land on grids they were never played on.
+            // Levels solved or begun in the former campaign would land on grids they were never played on:
+            // the dungeons solved go to the gallery.
+            val former = prefs.all.filterKeys { Regex("(done|marks)\\d+_\\d+").matches(it) }
+            prefs.keep(former.filterKeys { it.startsWith("done") }.values.filterIsInstance<String>())
             val editor = prefs.edit().putInt("campaign", CAMPAIGN)
-            for (key in prefs.all.keys) if (Regex("(done|marks)\\d+_\\d+").matches(key)) editor.remove(key)
+            for (key in former.keys) editor.remove(key)
             if (prefs.getString("last", "")!!.startsWith("C:")) editor.remove("last")
             editor.apply()
         }
@@ -231,21 +154,27 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
     var endlessSize by rememberSaveable { mutableIntStateOf(prefs.getInt("endlessSize", 8).takeIf { it in SIZES } ?: 8) }
     var reasoning by rememberSaveable { mutableIntStateOf(prefs.getInt("reasoning", 1).coerceIn(REASONINGS.indices)) }
     val toMenu = { screen = Screen.MENU }
+    val today = remember { today() }
     // One step back at a time: the level, its table, the difficulties, the menu.
     BackHandler(enabled = screen != Screen.MENU) {
         when {
-            screen == Screen.CAMPAIGN && level != 0 -> level = 0
+            screen == Screen.SHARED || screen == Screen.GALLERY -> { size = 0; screen = Screen.ENDLESS }
+            (screen == Screen.CAMPAIGN || screen == Screen.DAILY || screen == Screen.TUTORIAL) && level != 0 -> level = 0
             size != 0 && (screen == Screen.CAMPAIGN || screen == Screen.ENDLESS) -> size = 0
             else -> toMenu()
         }
     }
     when (screen) {
         Screen.MENU -> {
-            // The grid opened last: "C:size:level" in the campaign, "E:size" in Endless.
+            // The grid opened last: "C:size:level" in the campaign, "E:size" in Endless, "D:day" for a
+            // daily one, "S" for the one a friend sent.
             val last = prefs.getString("last", "")!!.split(':')
             val lastSize = last.getOrNull(1)?.toIntOrNull()?.takeIf { it in SIZES }
             val lastLevel = last.getOrNull(2)?.toIntOrNull()?.takeIf { it in 1..LEVELS }
+            val lastDay = last.getOrNull(1)?.toLongOrNull()?.takeIf { last[0] == "D" && it in today - DAYS + 1..today }
             val resume = when {
+                lastDay != null -> "Daily · ${dayName(lastDay)}"
+                last[0] == "S" && prefs.contains("shared") -> "A friend's dungeon"
                 lastSize == null -> null
                 last[0] == "E" -> "Endless · $lastSize×$lastSize · ${REASONINGS[reasoning]}"
                 last[0] == "C" && lastLevel != null -> "${difficulty(lastSize)} · Level $lastLevel"
@@ -254,10 +183,16 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
             Menu(
                 solved = SIZES.sumOf { prefs.solved(it) }, finished = SIZES.count { prefs.solved(it) >= LEVELS },
                 tutorialDone = prefs.getBoolean("tutorialDone", false), resume = resume,
+                daily = dailyName(today), dailyDone = prefs.contains("dailyDone$today"),
                 onResume = {
-                    size = lastSize!!
-                    level = lastLevel ?: 0
-                    screen = if (lastLevel != null) Screen.CAMPAIGN else Screen.ENDLESS
+                    size = lastSize ?: 0
+                    level = if (lastDay != null) (today - lastDay).toInt() + 1 else lastLevel ?: 0
+                    screen = when {
+                        lastDay != null -> Screen.DAILY
+                        last[0] == "S" -> Screen.SHARED
+                        lastLevel != null -> Screen.CAMPAIGN
+                        else -> Screen.ENDLESS
+                    }
                 },
             ) { size = 0; level = 0; screen = it }
         }
@@ -283,824 +218,20 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
                     }
                 }
                 Plank("Enter", "$endlessSize×$endlessSize · ${REASONINGS[reasoning]}", matter = Matter.GILDED) { size = endlessSize }
+                var entering by rememberSaveable { mutableStateOf(false) }
+                Planks {
+                    PlankButton("Gallery", matter = Matter.PARCHMENT) { screen = Screen.GALLERY }
+                    PlankButton("Enter a code", matter = Matter.PARCHMENT) { entering = true }
+                }
+                if (entering) EnterCode(prefs, { entering = false }) { screen = Screen.SHARED }
             }
         } else {
             Endless(prefs, audio, size, reasoning) { size = 0 }
         }
-        Screen.TUTORIAL -> Tutorial(prefs, toMenu) { size = 0; level = 0; screen = Screen.CAMPAIGN }
+        Screen.DAILY -> Daily(prefs, audio, today, level, { level = it }, toMenu)
+        Screen.SHARED -> Shared(prefs, audio) { screen = Screen.ENDLESS }
+        Screen.GALLERY -> Gallery(prefs) { screen = Screen.ENDLESS }
+        Screen.TUTORIAL -> Lessons(prefs, audio, level, { level = it }, toMenu) { size = 0; level = 0; screen = Screen.CAMPAIGN }
         Screen.OPTIONS -> Options(prefs, audio, toMenu)
-    }
-}
-
-/**
- * The way into the dungeon: its sign, the dark entrance and what watches from it, then the planks.
- * [finished] is how many difficulties of the campaign are solved through.
- */
-@Composable
-private fun Menu(solved: Int, finished: Int, tutorialDone: Boolean, resume: String?, onResume: () -> Unit, open: (Screen) -> Unit) {
-    val wall = painterResource(R.drawable.wall)
-    // How far the sign comes down to hang right over the arch, whatever room the entrance was given.
-    var drop by remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-    val activity = LocalActivity.current
-    Box(
-        Modifier.fillMaxSize().drawBehind {
-            // A dungeon wall in the dark: staggered stone blocks.
-            val block = size.width / 5
-            for (rowIndex in 0..(size.height / block).toInt()) {
-                for (column in -1..5) {
-                    translate(column * block + if (rowIndex % 2 == 0) 0f else block / 2, rowIndex * block) {
-                        with(wall) { draw(Size(block, block), colorFilter = StoneShade) }
-                    }
-                }
-            }
-            drawRect(Brush.verticalGradient(listOf(Color.Transparent, Bg), startY = size.height * 0.45f))
-        },
-    ) {
-        BoxWithConstraints(Modifier.safeDrawingPadding().fillMaxSize()) {
-            Column(
-                // The entrance takes the room the planks leave; the whole scrolls when even they do not fit: short screens, large fonts.
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(Modifier.offset { IntOffset(0, drop) }.semantics { heading() }.signboard().padding(horizontal = 34.dp, vertical = 4.dp)) {
-                    Text(
-                        "Oubliettes",
-                        color = Gold,
-                        style = TextStyle(fontFamily = Fraktur, fontSize = 50.sp, shadow = Shadow(Color.Black, Offset(0f, 4f), 6f)),
-                    )
-                }
-                Entrance(
-                    Modifier.weight(1f).fillMaxWidth().onSizeChanged {
-                        val arch = arch(it.width.toFloat(), it.height.toFloat())
-                        // Clear of the stones around the arch, less the gap the column already leaves.
-                        drop = (it.height - arch.height - arch.width * STONES + with(density) { 6.dp.toPx() }).toInt()
-                    },
-                )
-                Plank("Tutorial", matter = Matter.PARCHMENT, done = tutorialDone) { open(Screen.TUTORIAL) }
-                if (resume != null) Plank("Continue", resume, matter = Matter.GILDED, onClick = onResume)
-                Row(Modifier.widthIn(max = 320.dp).fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Plank("Campaign", "$solved / ${LEVELS * SIZES.size} solved", Modifier.weight(1f).fillMaxHeight(), seals = finished) {
-                        open(Screen.CAMPAIGN)
-                    }
-                    Plank("Endless", modifier = Modifier.weight(1f).fillMaxHeight()) { open(Screen.ENDLESS) }
-                }
-                Row(Modifier.widthIn(max = 320.dp).fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Plank("Options", modifier = Modifier.weight(1f).fillMaxHeight(), matter = Matter.IRON) { open(Screen.OPTIONS) }
-                    Plank("Quit", modifier = Modifier.weight(1f).fillMaxHeight(), matter = Matter.IRON) { activity?.finish() }
-                }
-            }
-            Spider()
-        }
-    }
-}
-
-/** The sign over the entrance: one old board, split at both ends, nailed askew. */
-private fun Modifier.signboard() = rotate(-3f).drawBehind {
-    val outline = listOf(
-        0.03f to 0.1f, 0.5f to 0.03f, 0.985f to 0.09f, // the top
-        0.955f to 0.3f, 1f to 0.44f, 0.965f to 0.6f, 0.99f to 0.93f, // the right end, split
-        0.55f to 0.98f, 0.1f to 0.94f, // the bottom
-        0.075f to 0.7f, 0f to 0.64f, 0.04f to 0.4f, 0.01f to 0.24f, // the left end, a corner gone
-    )
-    val board = Path().apply {
-        for ((index, point) in outline.withIndex()) {
-            if (index == 0) moveTo(point.first * size.width, point.second * size.height) else lineTo(point.first * size.width, point.second * size.height)
-        }
-        close()
-    }
-    fun at(x: Float, y: Float) = Offset(x * size.width, y * size.height)
-    drawPath(board, Brush.verticalGradient(Matter.WOOD.fill))
-    clipPath(board) {
-        // The grain, then a crack running in from each end.
-        for (k in 1..4) drawLine(DarkWood.copy(alpha = 0.22f), at(0f, k / 5f), at(1f, k / 5f + if (k % 2 == 0) 0.05f else -0.04f), 1.dp.toPx())
-        drawLine(DarkWood, at(1f, 0.44f), at(0.84f, 0.5f), 1.5.dp.toPx())
-        drawLine(DarkWood, at(0f, 0.64f), at(0.13f, 0.57f), 1.5.dp.toPx())
-    }
-    drawPath(board, DarkWood, style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
-    for (nail in listOf(at(0.085f, 0.3f), at(0.93f, 0.74f))) {
-        drawCircle(DarkWood, 4.dp.toPx(), nail)
-        drawCircle(Color(0xFFB9B4C8), 2.dp.toPx(), nail - Offset(1f, 1f))
-    }
-}
-
-/** How thick the stones around the arch are, in fractions of its width. */
-private const val STONES = 0.13f
-
-/** Width and height of the opening of the entrance, in the room it is given. */
-private fun arch(width: Float, height: Float): Size {
-    val opening = minOf(width * 0.54f, height * 0.8f)
-    return Size(opening, minOf(height, opening * 1.35f))
-}
-
-/** Who lurks in the entrance: which of [MONSTERS], where in the opening and how big, in fractions of its width and height. */
-private class Lurker(val kind: Int, val x: Float, val y: Float, val size: Float)
-
-private val LURKERS = listOf(
-    Lurker(2, 0.31f, 0.46f, 0.44f), Lurker(0, 0.64f, 0.66f, 0.36f), Lurker(5, 0.5f, 0.27f, 0.3f),
-    Lurker(1, 0.2f, 0.8f, 0.28f), Lurker(4, 0.74f, 0.4f, 0.42f),
-)
-
-/** The dungeon entrance: a stone arch between two torches, opening on the dark. Only eyes show in there. */
-@Composable
-private fun Entrance(modifier: Modifier) {
-    val torch = torchFrames()
-    val tick = rememberTick()
-    val clock = rememberClock()
-    Canvas(modifier) {
-        if (size.height < 1f) return@Canvas
-        val time = clock.value
-        val (width, height) = arch(size.width, size.height)
-        val left = (size.width - width) / 2
-        val top = size.height - height
-        val spring = top + width / 2 // where the arch starts
-        val stones = width * STONES
-        val opening = Path().apply {
-            moveTo(left, size.height)
-            lineTo(left, spring)
-            arcTo(Rect(left, top, left + width, top + width), 180f, 180f, false)
-            lineTo(left + width, size.height)
-            close()
-        }
-        val torchSize = width * 0.34f
-        val flames = listOf(left - stones - torchSize * 0.6f, left + width + stones + torchSize * 0.6f).map { Offset(it, spring) }
-        val frames = flames.indices.map { (tick.value + it * 2) % torch.size }
-        for ((index, flame) in flames.withIndex()) {
-            // The light wavers with the flame, never twice the same: two beats that drift apart.
-            val waver = 1f + 0.07f * sin(time * 9f + index * 2f) * sin(time * 3.7f + index)
-            val reach = width * 1.1f * waver
-            drawCircle(Brush.radialGradient(listOf(Color(0xFFF08A2A).copy(alpha = 0.42f * waver), Color.Transparent), flame, reach), reach, flame)
-            drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE066).copy(alpha = 0.3f * waver), Color.Transparent), flame, width * 0.3f), width * 0.3f, flame)
-        }
-        // The stones of the arch, then their joints; the dark covers the inner half of the stroke.
-        drawPath(opening, Color(0xFF6E6A86), style = Stroke(stones * 2))
-        val centre = Offset(left + width / 2, spring)
-        for (k in 0..8) {
-            val angle = PI.toFloat() * (1 + k / 8f)
-            val towards = Offset(cos(angle), sin(angle))
-            drawLine(Bg, centre + towards * (width / 2), centre + towards * (width / 2 + stones), 2.dp.toPx())
-        }
-        var y = spring + stones
-        while (y < size.height) {
-            for (x in listOf(left - stones, left + width)) drawLine(Bg, Offset(x, y), Offset(x + stones, y), 2.dp.toPx())
-            y += stones * 1.1f
-        }
-        drawPath(opening, Brush.verticalGradient(listOf(Color(0xFF040308), Color(0xFF12111A)), startY = top, endY = size.height))
-        for ((index, lurker) in LURKERS.withIndex()) {
-            val cell = lurker.size * width
-            translate(left + lurker.x * width - cell / 2, top + lurker.y * height - cell / 2) {
-                drawEyes(MONSTERS[lurker.kind], tick.value, index, cell, lurking = true)
-            }
-        }
-        for ((index, flame) in flames.withIndex()) {
-            translate(flame.x - torchSize / 2, flame.y - torchSize * 0.25f) { with(torch[frames[index]]) { draw(Size(torchSize, torchSize)) } }
-            // Sparks rise from the flame and die out, one after the other.
-            if (!Comfort.calm) for (spark in 0..3) {
-                val life = (time * 0.4f + spark * 0.27f + index * 0.5f).mod(1f)
-                val sway = sin(spark * 7f + life * 6f) * torchSize * 0.16f
-                drawCircle(Color(0xFFFFB347).copy(alpha = 1f - life), torchSize * 0.022f, flame + Offset(sway, -torchSize * (0.15f + life * 1.1f)))
-            }
-        }
-    }
-}
-
-/**
- * Menu entry: a wide sign with a title and maybe a line of [detail]. Its [matter] tells what it is
- * for. [done] strikes a seal next to the title; [seals] are smaller ones under it, one per thing finished.
- */
-@Composable
-private fun Plank(
-    title: String,
-    detail: String? = null,
-    modifier: Modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth(),
-    matter: Matter = Matter.WOOD,
-    done: Boolean = false,
-    seals: Int = 0,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier
-            .plank(matter = matter)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { if (done) stateDescription = "completed" }
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = matter.ink, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            if (done) Seal(22.dp)
-        }
-        if (detail != null) Text(detail, color = matter.ink.copy(alpha = 0.85f), fontSize = 15.sp, textAlign = TextAlign.Center)
-        if (seals > 0) {
-            Row(
-                Modifier.padding(top = 3.dp).semantics { contentDescription = "$seals of ${SIZES.size} difficulties completed" },
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) { repeat(seals) { Seal(13.dp) } }
-        }
-    }
-}
-
-/** The difficulties of Campaign or Endless, each with its line of [detail] and a seal once [finished]. */
-@Composable
-private fun Difficulties(title: String, onMenu: () -> Unit, detail: (Int) -> String, finished: (Int) -> Boolean, pick: (Int) -> Unit) {
-    Page(title, onMenu, spider = true) {
-        for ((index, size) in SIZES.withIndex()) Plank(DIFFICULTIES[index], detail(size), done = finished(size)) { pick(size) }
-    }
-}
-
-/**
- * Shared frame of the inner screens: a way back, a title, then the content. It scrolls when the
- * content is taller than the screen, unless the content does its own scrolling ([scroll] false).
- * A page with a [foot] rests it on the bottom of the screen, under the thumb, and centres its
- * content in the room left under the title. [end] sits opposite the way back. A [spider] visits the screens where
- * nothing else moves; never a grid.
- */
-@Composable
-private fun Page(
-    title: String,
-    onBack: () -> Unit,
-    back: String = "Menu",
-    scroll: Boolean = true,
-    spider: Boolean = false,
-    end: @Composable () -> Unit = {},
-    foot: (@Composable ColumnScope.() -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) = Box(Modifier.safeDrawingPadding().fillMaxSize()) {
-    Column(
-        Modifier.fillMaxSize().then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // The title between the two planks, or on a line of its own when it does not fit: large fonts.
-        Layout(
-            content = {
-                Text(title, Modifier.semantics { heading() }, color = Gold, fontFamily = Fraktur, fontSize = 30.sp, textAlign = TextAlign.Center)
-                PlankButton(back, glyph = BackGlyph, onClick = onBack)
-                Box { end() }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { measurables, constraints ->
-            val loose = constraints.copy(minWidth = 0, minHeight = 0)
-            val start = measurables[1].measure(loose)
-            val opposite = measurables[2].measure(loose)
-            val gap = 8.dp.roundToPx()
-            val between = constraints.maxWidth - 2 * (maxOf(start.width, opposite.width) + gap)
-            val beside = measurables[0].maxIntrinsicWidth(constraints.maxHeight) <= between
-            val name = measurables[0].measure(loose.copy(maxWidth = if (beside) between else constraints.maxWidth))
-            val planks = maxOf(start.height, opposite.height)
-            val row = if (beside) maxOf(planks, name.height) else planks
-            layout(constraints.maxWidth, if (beside) row else planks + gap + name.height) {
-                start.placeRelative(0, (row - start.height) / 2)
-                opposite.placeRelative(constraints.maxWidth - opposite.width, (row - opposite.height) / 2)
-                name.placeRelative((constraints.maxWidth - name.width) / 2, if (beside) (row - name.height) / 2 else planks + gap)
-            }
-        }
-        if (foot != null) Spacer(Modifier.weight(1f))
-        for (part in listOfNotNull(content, foot)) {
-            Column(
-                Modifier.padding(top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                content = part,
-            )
-            if (foot != null && part === content) Spacer(Modifier.weight(1f))
-        }
-    }
-    if (spider) Spider()
-}
-
-/** A notice nailed over the screen: a blackletter [title], then the content. */
-@Composable
-private fun Notice(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(8.dp)
-    Dialog(onDismiss) {
-        Column(
-            Modifier.clip(shape).background(Bg).border(2.dp, Gold, shape).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(title, Modifier.semantics { heading() }, color = Gold, fontFamily = Fraktur, fontSize = 28.sp)
-            content()
-        }
-    }
-}
-
-/** A row of planks, centred, that goes on to a second line when it does not fit: large fonts. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun Planks(content: @Composable () -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) { content() }
-}
-
-/**
- * Under a grid: what a tap lays. [brush] is [WALL] or [KNOWN_OPEN], or 0 when a tap cycles through
- * the marks; it is kept from one grid to the next.
- */
-@Composable
-private fun Brushes(prefs: SharedPreferences, brush: MutableIntState) {
-    val wall = painterResource(R.drawable.wall)
-    val bricks: Glyph = { with(wall) { draw(size) } }
-    for ((value, name, glyph) in listOf(Triple(WALL, "Wall", bricks), Triple(KNOWN_OPEN, "Hallway", HallwayGlyph))) {
-        PlankButton(name, selected = brush.intValue == value, glyph = glyph) {
-            brush.intValue = if (brush.intValue == value) 0 else value
-            prefs.edit().putInt("brush", brush.intValue).apply()
-        }
-    }
-}
-
-/** Over a grid, opposite the way back: the rules, on parchment. */
-@Composable
-private fun Rules() {
-    var show by rememberSaveable { mutableStateOf(false) }
-    PlankButton("?", matter = Matter.PARCHMENT, description = "Rules") { show = true }
-    if (show) {
-        Notice("Rules", { show = false }) {
-            for (rule in RULES) Text(rule, Modifier.fillMaxWidth(), color = Ink, fontSize = 16.sp, lineHeight = 20.sp)
-            PlankButton("Close") { show = false }
-        }
-    }
-}
-
-/**
- * The grid written down before a try, and the way back to it: there once a checkpoint is laid, and
- * of use once the grid has changed since. [act] wraps what each plank does.
- */
-@Composable
-private fun Checkpoints(session: Session, act: (() -> Unit) -> () -> Unit = { it }) {
-    PlankButton("Checkpoint", enabled = session.canCheckpoint, matter = Matter.PARCHMENT, onClick = act(session::checkpoint))
-    if (session.hasCheckpoint) PlankButton("Return", enabled = session.canReturn, matter = Matter.PARCHMENT, onClick = act(session::toCheckpoint))
-}
-
-/** The table of levels of the difficulty [size], or the level being played when [level] is not 0. */
-@Composable
-private fun Campaign(prefs: SharedPreferences, audio: Audio, levels: List<Puzzle>, size: Int, level: Int, open: (Int) -> Unit, onBack: () -> Unit) {
-    if (level != 0) {
-        LaunchedEffect(size, level) { prefs.edit().putString("last", "C:$size:$level").apply() }
-        Game(
-            prefs, audio, "Campaign", onBack = { open(0) }, back = "Levels",
-            puzzle = levels[level - 1], saveKey = "marks${size}_$level", legacyId = "$level",
-            variety = level, status = "${difficulty(size)} · Level $level",
-            solvedStatus = { "${difficulty(size)} · ${prefs.solved(size)} / $LEVELS solved" },
-            next = if (level < LEVELS) "Next level" else "Levels", onNext = { open(if (level < LEVELS) level + 1 else 0) },
-            onSolved = { prefs.edit().putString("done${size}_$level", it).apply() },
-        )
-        return
-    }
-    Page(difficulty(size), onBack, back = "Campaign", scroll = false, spider = true) {
-        Text("$size×$size · ${prefs.solved(size)} / $LEVELS solved", color = Dim)
-        LazyVerticalGrid(
-            GridCells.Fixed(5),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(LEVELS) { index ->
-                val done = prefs.getString("done${size}_${index + 1}", null)?.takeIf { it.length == size * size }
-                // A save holds its marks after the first colon: begun once any cell is marked.
-                val begun = prefs.getString("marks${size}_${index + 1}", "")!!.split(':').getOrNull(1)?.any { it != '0' } == true
-                LevelTile(index + 1, done, begun, size) { open(index + 1) }
-            }
-        }
-    }
-}
-
-/**
- * A stone slab bearing the level number. A level begun is rimmed in gold and says so; a solved one
- * shows a small picture of the finished dungeon.
- */
-@Composable
-private fun LevelTile(number: Int, done: String?, begun: Boolean, size: Int, onClick: () -> Unit) {
-    val stone = painterResource(R.drawable.wall)
-    val shape = RoundedCornerShape(4.dp)
-    Column(
-        Modifier
-            .aspectRatio(1f)
-            .clip(shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { stateDescription = if (done != null) "solved" else if (begun) "begun" else "not started" }
-            .drawBehind {
-                if (done == null) {
-                    with(stone) { draw(this@drawBehind.size, colorFilter = StoneShade) }
-                } else {
-                    val cell = this.size.width / size
-                    for (i in done.indices) {
-                        val color = when (done[i]) {
-                            '#' -> Color(0xFFA29EBA)
-                            'M' -> Red
-                            'C' -> Gold
-                            else -> OpenFloor
-                        }
-                        // One pixel wider than the cell: no hairline gaps between neighbours.
-                        drawRect(color, Offset(i % size * cell, i / size * cell), Size(cell + 1, cell + 1))
-                    }
-                }
-            }
-            .then(if (begun && done == null) Modifier.border(2.dp, Gold, shape) else Modifier),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            "$number",
-            color = if (done == null) Ink else Color.White,
-            style = TextStyle(fontFamily = Almendra, fontWeight = FontWeight.Bold, fontSize = 22.sp, shadow = Shadow(Color.Black, Offset(0f, 2f), 6f)),
-        )
-        // Already said by the state description.
-        if (begun && done == null) Text("begun", Modifier.clearAndSetSemantics {}, color = Gold, fontSize = 12.sp, lineHeight = 12.sp)
-    }
-}
-
-private fun endlessSeed(prefs: SharedPreferences, slot: String) =
-    if (prefs.contains("seed$slot")) prefs.getLong("seed$slot", 0) else Random.nextLong()
-
-/** Random grids of one [size] and one [reasoning] of REASONINGS, one after the other until the player walks out. */
-@Composable
-private fun Endless(prefs: SharedPreferences, audio: Audio, size: Int, reasoning: Int, onBack: () -> Unit) {
-    // What the grid under way is saved as. The middle one keeps the name grids had before there was a choice, and the grid begun then.
-    val slot = if (reasoning == 1) "$size" else "${size}r$reasoning"
-    var seed by remember { mutableLongStateOf(endlessSeed(prefs, slot)) }
-    var solvedCount by remember { mutableIntStateOf(prefs.getInt("solved", 0)) }
-    val status = "$size×$size · ${REASONINGS[reasoning]} · $solvedCount solved"
-    // One grid: leaving it (the next grid, the way back) cancels its digging.
-    key(seed) {
-        // The grid itself is saved next to its seed, so a save never depends on the generator giving it again.
-        var puzzle by remember {
-            mutableStateOf(prefs.getString("puzzleE$slot", "")!!.takeIf { it.startsWith("$seed;") }?.let { decodePuzzle(it.substringAfter(';')) })
-        }
-        var failed by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            prefs.edit().putLong("seed$slot", seed).putString("last", "E:$size").apply()
-            if (puzzle != null) return@LaunchedEffect
-            val dug = withContext(Dispatchers.Default) { generate(size, size, seed, reasoning = probesOf(size, reasoning)) { !isActive } }
-            if (dug == null) {
-                failed = true
-            } else {
-                prefs.edit().putString("puzzleE$slot", "$seed;${dug.encode()}").apply()
-                puzzle = dug
-            }
-        }
-        val p = puzzle
-        if (p != null) {
-            Game(
-                prefs, audio, "Endless", onBack, back = "Choose",
-                puzzle = p, saveKey = "marksE$slot", legacyId = "$seed",
-                variety = seed.toInt(), status = status, solvedStatus = { status },
-                next = "Next grid", onNext = { seed = Random.nextLong() }, skip = "New grid", auto = true,
-                // A grid counts the moment it is solved, and only once however often it is solved again.
-                onSolved = {
-                    if (!prefs.contains("counted$slot") || prefs.getLong("counted$slot", 0) != seed) {
-                        solvedCount++
-                        prefs.edit().putInt("solved", solvedCount).putLong("counted$slot", seed).apply()
-                    }
-                },
-            )
-        } else {
-            Page("Endless", onBack, back = "Choose", foot = {}) {
-                Text(status, color = Dim)
-                Column(
-                    Modifier.fillMaxWidth().aspectRatio(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    if (failed) {
-                        Text("The diggers gave up on this one.", color = Dim, fontStyle = FontStyle.Italic)
-                        PlankButton("Dig another") { seed = Random.nextLong() }
-                    } else {
-                        Diggers()
-                        Text("Digging…", Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = Dim, fontStyle = FontStyle.Italic)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** While a grid is dug: a torch, and the dwellers hopping one after the other as they wait for their dungeon. */
-@Composable
-private fun Diggers() {
-    val torch = torchFrames()
-    val bodies = monsterBodies()
-    val tick = rememberTick()
-    val clock = rememberClock()
-    val wave = if (Comfort.calm) {
-        null
-    } else {
-        rememberInfiniteTransition(label = "digging")
-            .animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "wave")
-    }
-    val dwellers = listOf(2, 0, null, 3, 4) // imp, slime, the torch, skull, bat
-    Canvas(Modifier.size(width = 264.dp, height = 64.dp)) {
-        val cell = size.width / dwellers.size
-        for ((index, kind) in dwellers.withIndex()) {
-            // Each one leaves the ground for a fifth of the loop, in turn.
-            val turn = wave?.let { (it.value * dwellers.size - index).mod(dwellers.size.toFloat()) } ?: 1f
-            val hop = if (kind != null && turn < 1f) sin(PI.toFloat() * turn) * cell * 0.3f else 0f
-            translate(index * cell, size.height - cell) {
-                if (kind == null) {
-                    with(torch[tick.value % torch.size]) { draw(Size(cell, cell)) }
-                } else {
-                    drawMonster(kind, bodies, tick.value, index, cell, clock.value, hop)
-                }
-            }
-        }
-    }
-}
-
-/**
- * One grid being played. Marks and their history are saved under [saveKey] after every action;
- * [legacyId] is what a save of 0.4 was tagged with. [onSolved] receives the picture of the finished
- * dungeon, the moment it is solved and again whenever a solved grid is reopened. [onNext] is only
- * offered once solved; [skip], when given, names a plank over the grid that leaves it unsolved for
- * the next one. [status] is shown above the grid, and [solvedStatus] under the announcement once it is solved.
- *
- * With the help turned on in Options, a Check plank crosses the marks that are wrong for three seconds,
- * then rests for a minute.
- */
-@Composable
-private fun Game(
-    prefs: SharedPreferences,
-    audio: Audio,
-    title: String,
-    onBack: () -> Unit,
-    back: String = "Menu",
-    puzzle: Puzzle,
-    saveKey: String,
-    legacyId: String,
-    variety: Int,
-    status: String,
-    solvedStatus: () -> String,
-    next: String,
-    onNext: () -> Unit,
-    skip: String? = null,
-    auto: Boolean = false,
-    onSolved: (picture: String) -> Unit,
-) {
-    val session = remember(puzzle) { Session(puzzle, prefs.getString(saveKey, null), legacyId, prefs.getBoolean("complete", true)) }
-    val haptics = remember { prefs.getBoolean("haptics", true) }
-    val ruleHint = remember { prefs.getBoolean("ruleHint", true) }
-    val help = remember { prefs.getBoolean("help", false) }
-    val brush = remember { mutableIntStateOf(prefs.getInt("brush", 0)) }
-    // What the player is asked to confirm, by the name of its plank: [skip] or Reset. Empty for nothing.
-    var asking by rememberSaveable(puzzle) { mutableStateOf("") }
-    // The marks found wrong by the check, while they are shown: null the rest of the time.
-    var wrong by remember(session) { mutableStateOf<Set<Int>?>(null) }
-    // The Check plank rests after each use.
-    var checked by remember(session) { mutableStateOf(false) }
-    LaunchedEffect(checked) {
-        if (!checked) return@LaunchedEffect
-        delay(3_000)
-        wrong = null
-        delay(57_000)
-        checked = false
-    }
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-
-    DisposableEffect(view) {
-        view.keepScreenOn = prefs.getBoolean("keepScreenOn", true)
-        onDispose { view.keepScreenOn = false }
-    }
-    LaunchedEffect(session) { if (session.solved) onSolved(session.picture()) }
-    // The music a solved grid stopped comes back with the next screen, whichever it is.
-    DisposableEffect(session) { onDispose { audio.resume() } }
-    // The time to see the dungeon finished, then on to the next one. Not in calm mode, where nothing moves on its own.
-    LaunchedEffect(session.solved) {
-        if (auto && session.solved && !Comfort.calm) {
-            delay(2_500)
-            onNext()
-        }
-    }
-
-    /** Wraps a button's action: a click, and the save. */
-    fun act(action: () -> Unit) = {
-        action()
-        wrong = null
-        audio.play(audio.click)
-        prefs.edit().putString(saveKey, session.save()).apply()
-    }
-
-    Page(
-        title, onBack, back,
-        end = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (!session.solved) {
-                    // The marks of a grid left this way are gone for good: ask first when there are any.
-                    if (skip != null) {
-                        PlankButton("", glyph = SkipGlyph, description = skip) { if (session.marks.any { it != 0 }) asking = skip else onNext() }
-                    }
-                    PlankButton("", enabled = session.marks.any { it != 0 }, matter = Matter.IRON, glyph = ResetGlyph, description = "Reset") {
-                        asking = "Reset"
-                    }
-                }
-                Rules()
-            }
-        },
-        foot = {
-            if (session.solved) {
-                Planks {
-                    PlankButton("Play again", onClick = act { session.reset(); audio.resume() })
-                    PlankButton(next, onClick = onNext)
-                }
-            } else {
-                Planks {
-                    Brushes(prefs, brush)
-                    PlankButton("", enabled = session.canUndo, matter = Matter.IRON, glyph = UndoGlyph, description = "Undo", onClick = act(session::undo))
-                    PlankButton("", enabled = session.canRedo, matter = Matter.IRON, glyph = RedoGlyph, description = "Redo", onClick = act(session::redo))
-                }
-                // Apart from the marks and their history: what a try is framed with.
-                Planks {
-                    Checkpoints(session, ::act)
-                    if (help) {
-                        PlankButton("Check", enabled = !checked && session.marks.any { it != 0 }, matter = Matter.IRON) {
-                            wrong = session.mistakes()
-                            checked = true
-                        }
-                    }
-                }
-            }
-        },
-    ) {
-        // One node, so that screen readers announce what it turns into.
-        Column(
-            Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (session.solved) {
-                Text("Dungeon solved!", color = Gold, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text(solvedStatus(), color = Ink)
-            } else {
-                // What the check found takes the place of the status while it shows: the grid does not move.
-                val found = wrong?.let { if (it.isEmpty()) "No mistake so far." else if (it.size == 1) "1 mistake, crossed out." else "${it.size} mistakes, crossed out." }
-                if (found != null) Text(found, color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center) else Text(status, color = Dim)
-                if (ruleHint && session.ruleBroken) {
-                    Text("Every count is met, yet a rule is broken.", color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)
-                }
-            }
-        }
-        Board(
-            session, locked = session.solved, celebrate = session.solved, variety = variety, wrong = wrong.orEmpty(), brush = brush.intValue,
-            onPaint = {
-                wrong = null
-                audio.play(audio.click)
-                if (haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            },
-            onStroke = { won ->
-                prefs.edit().putString(saveKey, session.save()).apply()
-                if (won) {
-                    audio.victory()
-                    if (haptics) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onSolved(session.picture())
-                }
-            },
-        )
-    }
-    if (asking.isNotEmpty()) {
-        Notice(asking, { asking = "" }) {
-            Text(
-                if (asking == skip) "Leave this grid? Its marks will be lost." else "Empty this grid? Undo brings the marks back.",
-                color = Ink, textAlign = TextAlign.Center,
-            )
-            Planks {
-                PlankButton("Stay") { asking = "" }
-                PlankButton(asking, onClick = if (asking == skip) { { asking = ""; onNext() } } else act { asking = ""; session.reset() })
-            }
-        }
-    }
-}
-
-private fun Session.show(step: TutorialStep) {
-    paint(step.walls, WALL)
-    paint(step.open, KNOWN_OPEN)
-}
-
-/** A fixed solve, one deduction at a time: the player marks the cells of each step, or asks to be shown. */
-@Composable
-private fun Tutorial(prefs: SharedPreferences, onMenu: () -> Unit, onPlay: () -> Unit) {
-    var index by rememberSaveable { mutableIntStateOf(0) }
-    // Back after the process was killed, the steps already passed are marked again.
-    val session = remember { Session(tutorialPuzzle).also { s -> tutorialSteps.take(index).forEach { s.show(it) } } }
-    val brush = remember { mutableIntStateOf(prefs.getInt("brush", 0)) }
-    val step = tutorialSteps[index]
-    val marks = session.marks
-    val toMark = (step.walls.filter { marks[it] != WALL } + step.open.filter { marks[it] != KNOWN_OPEN }).toSet()
-    val last = index == tutorialSteps.lastIndex
-    LaunchedEffect(last) { if (last) prefs.edit().putBoolean("tutorialDone", true).apply() }
-
-    Page(
-        "Tutorial", onMenu, end = { Rules() },
-        foot = {
-            Text(step.text, Modifier.fillMaxWidth().heightIn(min = 130.dp), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, textAlign = TextAlign.Center)
-            Text(
-                if (toMark.isNotEmpty()) "Your turn: ${toMark.size} to mark" else "",
-                Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                color = Gold, fontStyle = FontStyle.Italic,
-            )
-            // The step about checkpoints shows them in place of the brushes: a tap still builds its wall.
-            Planks { if (step.checkpoints) Checkpoints(session) else Brushes(prefs, brush) }
-            Planks {
-                PlankButton("Previous", enabled = index > 0) { index-- }
-                PlankButton("Show me", enabled = toMark.isNotEmpty()) { session.show(step) }
-                PlankButton(if (last) "Play" else "Next", enabled = toMark.isEmpty()) { if (last) onPlay() else index++ }
-            }
-        },
-    ) {
-        Text("Step ${index + 1} / ${tutorialSteps.size}", color = Dim)
-        Board(session, locked = last, celebrate = last && session.solved, focus = step.focus, toMark = toMark, brush = brush.intValue)
-    }
-}
-
-@Composable
-private fun Toggle(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().toggleable(checked, role = Role.Checkbox, onValueChange = onChange).padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IronCheck(checked)
-        Text(text, color = Ink)
-    }
-}
-
-/** A setting kept under [key], [default] until changed. Read where it is used with the same key; [onChange] applies it at once. */
-@Composable
-private fun PrefToggle(prefs: SharedPreferences, key: String, text: String, default: Boolean = true, onChange: (Boolean) -> Unit = {}) {
-    var on by remember { mutableStateOf(prefs.getBoolean(key, default)) }
-    Toggle(text, on) {
-        on = it
-        prefs.edit().putBoolean(key, it).apply()
-        onChange(it)
-    }
-}
-
-@Composable
-private fun Options(prefs: SharedPreferences, audio: Audio, onMenu: () -> Unit) {
-    val context = LocalContext.current
-    var said by rememberSaveable { mutableStateOf("") }
-    // A save read from a file, waiting for the player to agree to lose what this phone holds.
-    var loaded by remember { mutableStateOf<Map<String, Any>?>(null) }
-    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if (uri != null) {
-            said = runCatching { context.contentResolver.openOutputStream(uri)!!.use { it.write(backupText(prefs.all).toByteArray()) } }
-                .fold({ "Progress saved to the file." }, { "The file could not be written." })
-        }
-    }
-    val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            loaded = runCatching { context.contentResolver.openInputStream(uri)!!.use { parseBackup(it.readBytes().decodeToString()) } }.getOrNull()
-            said = if (loaded == null) "This file is not an Oubliettes save." else ""
-        }
-    }
-    Page("Options", onMenu, spider = true) {
-        Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // The sliders carry these names themselves for screen readers.
-            Text("Sounds", Modifier.clearAndSetSemantics {}, color = Ink, fontWeight = FontWeight.Bold)
-            IronSlider("Sounds", audio.soundVolume, { audio.soundVolume = it; audio.save() }, onValueChangeFinished = { audio.play(audio.click) })
-            Text("Music", Modifier.clearAndSetSemantics {}, color = Ink, fontWeight = FontWeight.Bold)
-            IronSlider("Music", audio.musicVolume, { audio.musicVolume = it; audio.save() })
-            Spacer(Modifier.height(8.dp))
-            PrefToggle(prefs, "haptics", "Vibrate on every mark")
-            PrefToggle(prefs, "keepScreenOn", "Keep the screen on while playing")
-            PrefToggle(prefs, "complete", "Finish a row or a column once it can only be filled one way")
-            PrefToggle(prefs, "ruleHint", "Say when every count is met but a rule is broken")
-            PrefToggle(prefs, "help", "Help: a Check plank under the grid shows the wrong marks for three seconds, once a minute", default = false)
-            PrefToggle(prefs, "magnifier", "Magnifier under the finger on large grids") { Comfort.magnifier = it }
-            PrefToggle(prefs, "plainDigits", "Plain digits for the wall counts", Comfort.plainDigits) { Comfort.plainDigits = it }
-            PrefToggle(prefs, "calm", "Calm mode: nothing moves on its own", Comfort.calm) { Comfort.calm = it }
-            Spacer(Modifier.height(8.dp))
-            Text("Progress", color = Ink, fontWeight = FontWeight.Bold)
-            Text(
-                "Progress stays through updates, but not when the app is removed. A file keeps it: " +
-                    "solved levels, grids in progress and settings.",
-                color = Dim, fontSize = 15.sp,
-            )
-            Planks {
-                PlankButton("Save to a file") { export.launch("oubliettes-save.txt") }
-                PlankButton("Load a file") { import.launch(arrayOf("text/plain")) }
-            }
-            Text(said, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, color = Ink, fontStyle = FontStyle.Italic)
-        }
-    }
-    loaded?.let { saved ->
-        Notice("Load a file", { loaded = null }) {
-            Text("Replace the progress and the settings on this phone by those of the file?", color = Ink, textAlign = TextAlign.Center)
-            Planks {
-                PlankButton("Keep mine") { loaded = null }
-                PlankButton("Load") {
-                    val editor = prefs.edit().clear()
-                    for ((key, value) in saved) when (value) {
-                        is Boolean -> editor.putBoolean(key, value)
-                        is Int -> editor.putInt(key, value)
-                        is Long -> editor.putLong(key, value)
-                        is Float -> editor.putFloat(key, value)
-                        else -> editor.putString(key, value as String)
-                    }
-                    editor.apply()
-                    // Sound, comfort and every screen read the preferences when they start: start again.
-                    (context as Activity).recreate()
-                }
-            }
-        }
     }
 }

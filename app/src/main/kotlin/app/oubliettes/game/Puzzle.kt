@@ -105,3 +105,10 @@ fun isSolved(p: Puzzle, walls: BooleanArray): Boolean {
     }
     return reached == openCount
 }
+
+/**
+ * The grid someone sent, wherever it is in [text]: what [Puzzle.encode] wrote, square and of a size
+ * the game shows. Null when there is none. That it has one solution is left to [solutions].
+ */
+fun findPuzzle(text: String): Puzzle? = Regex("""\d+x\d+(\|[\d,]*){4}""").find(text)?.let { decodePuzzle(it.value) }
+    ?.takeIf { it.width == it.height && it.width in 5..14 }

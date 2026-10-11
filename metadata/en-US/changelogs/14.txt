@@ -1,0 +1,6 @@
+- Hints that teach: where to look, then why, then which cells
+- Tutorial lessons: treasure rooms, dead ends, narrow hallways, one dungeon, trying a cell out
+- Daily dungeon, with the last two weeks open
+- Share a solved grid and dig the one a friend sent; a gallery of solved dungeons
+- Campaign chapters, two-finger zoom, a mark on the cells of a try
+- Saves of 0.7.3 are kept

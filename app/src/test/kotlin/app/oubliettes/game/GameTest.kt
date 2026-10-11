@@ -69,6 +69,20 @@ class GameTest {
     }
 
     @Test
+    fun lessonsTeachWhatTheySay() {
+        val taught = listOf(Rule.ROOM, Rule.DEAD_END, Rule.BLOCK, Rule.TRY, Rule.TRY)
+        assertEquals(taught.size, lessons.size)
+        for ((lesson, rule) in lessons.zip(taught)) {
+            val marks = lesson.guided.monsters + lesson.guided.chests + lesson.steps.flatMap { it.walls + it.open }
+            assertEquals("${lesson.title}: every cell is explained exactly once", (0 until 36).toList(), marks.sorted())
+            for (p in listOf(lesson.guided, lesson.practise)) {
+                assertEquals(1, solutions(p, maxNodes = Int.MAX_VALUE)!!.size)
+                assertTrue(lesson.title, steps(p)!!.any { it.rule == rule })
+            }
+        }
+    }
+
+    @Test
     fun solverMatchesBruteForce() {
         val rng = Random(1)
         val w = 5
@@ -155,11 +169,11 @@ class GameTest {
         }
         // A grid can be asked for by how much reasoning it takes.
         for (seed in 0L until 20) {
-            assertEquals(0, probes(generate(8, 8, seed, reasoning = 0..0)!!))
-            assertTrue(probes(generate(8, 8, seed, reasoning = 10..Int.MAX_VALUE)!!) >= 10)
+            assertTrue(effort(steps(generate(8, 8, seed, reasoning = 0 until 54)!!)!!) < 54)
+            assertTrue(effort(steps(generate(8, 8, seed, reasoning = 138..Int.MAX_VALUE)!!)!!) >= 138)
         }
         // The rarest the game asks for, in the size that takes longest to dig.
-        for (seed in 0L until 10) assertTrue(probes(generate(14, 14, seed, reasoning = 62..Int.MAX_VALUE)!!) >= 62)
+        for (seed in 0L until 10) assertTrue(effort(steps(generate(14, 14, seed, reasoning = 979..Int.MAX_VALUE)!!)!!) >= 979)
         val a = generate(8, 8, 42)!!
         val b = generate(8, 8, 42)!!
         assertTrue(a.rowCounts.contentEquals(b.rowCounts) && a.monsters == b.monsters && a.chests == b.chests)
@@ -188,6 +202,41 @@ class GameTest {
             "6x6|3,2,1,5,1,6|2,2,2,4,2,6|10,7|7", // monster on the chest
             "40x1|0|0|0|1", // wider than the solver can hold
         )) assertNull(bad, decodePuzzle(bad))
+        // A grid sent by someone is found in the words around it, and only in a size the game shows.
+        assertEquals(p.encode(), findPuzzle("Oubliettes · Endless\nSolved with 2 hints.\n${p.encode()}\n")!!.encode())
+        for (bad in listOf("", "no grid here", "40x1|0|0|0|1", "3x3|0,0,0|0,0,0||", "6x8|0,0,0,0,0,0,0,0|0,0,0,0,0,0||")) assertNull(bad, findPuzzle(bad))
+    }
+
+    @Test
+    fun everyStepIsSoundAndExplained() {
+        val seen = mutableSetOf<Rule>()
+        for ((size, seeds) in listOf(6 to 60, 8 to 60, 10 to 20)) for (seed in 0L until seeds) {
+            val p = generate(size, size, seed)!!
+            val solution = solutions(p)!!.single()
+            val steps = steps(p)!!
+            val marks = IntArray(size * size)
+            for (step in steps) {
+                // A hint from the marks so far is that very step, and never contradicts the solution.
+                val hint = hint(p, marks)!!
+                assertEquals(step.rule, hint.rule)
+                assertEquals(step.walls to step.open, hint.walls to hint.open)
+                assertTrue(step.walls.isNotEmpty() || step.open.isNotEmpty())
+                assertTrue(step.walls.all { solution[it] && marks[it] == 0 } && step.open.none { solution[it] })
+                assertTrue(step.nudge(p).isNotEmpty() && step.reason(p).isNotEmpty())
+                step.walls.forEach { marks[it] = 1 }
+                step.open.forEach { marks[it] = 2 }
+                seen += step.rule
+            }
+            // The plainest grids are the ones no try is needed for.
+            assertEquals(probes(p) == 0, steps.none { it.rule >= Rule.TRY })
+            assertTrue(effort(steps) >= 0)
+        }
+        // Cells cut off are nearly always dead ends first, and both ways of a cell rarely agree: no grid here needs them.
+        assertTrue("rules seen: $seen", seen.containsAll(Rule.entries - Rule.CUT - Rule.EITHER))
+        // Marks that break a rule give no hint, and neither does a grid with nothing left to find.
+        val p = generate(8, 8, 1)!!
+        assertNull(hint(p, IntArray(64) { 1 }))
+        assertNull(hint(p, solutions(p)!!.single().let { walls -> IntArray(64) { if (walls[it]) 1 else 2 } }))
     }
 
     /** The campaign is a file, not seeds: its grids must stay what they are. */

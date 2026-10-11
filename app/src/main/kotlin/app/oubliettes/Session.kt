@@ -1,10 +1,12 @@
 package app.oubliettes
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.oubliettes.game.Puzzle
+import app.oubliettes.game.Step
 import app.oubliettes.game.drawing
 import app.oubliettes.game.isSolved
 import app.oubliettes.game.solutions
@@ -28,6 +30,8 @@ private const val HISTORY = 50
  *
  * A [checkpoint] remembers the marks before the player tries something out, when deduction runs dry;
  * [toCheckpoint] brings back the latest one. They pile up, one per try within a try.
+ *
+ * A [hint] is the plainest deduction the marks allow; how many were asked for is kept with the grid.
  */
 internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: String? = null, private val completes: Boolean = false) {
     private val width = puzzle.width
@@ -55,6 +59,13 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     /** Only once the grid has changed since the latest checkpoint: there is something to come back from. */
     val canReturn get() = checkpoints.lastOrNull()?.contentEquals(marks) == false
 
+    /** The cells that changed since the latest checkpoint: the try under way. */
+    val tried get() = checkpoints.lastOrNull()?.let { then -> marks.indices.filter { then[it] != marks[it] }.toSet() } ?: emptySet()
+
+    /** Hints asked for on this grid so far. */
+    var hints by mutableIntStateOf(0)
+        private set
+
     private val solution by lazy { solutions(puzzle, limit = 1)?.firstOrNull() }
 
     // The stroke in progress.
@@ -63,6 +74,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     private var alongRow: Boolean? = null
     private var last = 0
     private var repaint = emptySet<Int>()
+    private var redoable = emptyList<IntArray>() // what Redo held before the stroke, for [cancel]
 
     /** The cell the player marked last: its row and its column are the ones [complete] may finish. */
     private var latest = 0
@@ -80,11 +92,12 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
             undone += snapshots(parts.getOrNull(2))
             redone += snapshots(parts.getOrNull(3))
             checkpoints += snapshots(parts.getOrNull(4))
+            hints = parts.getOrNull(5)?.toIntOrNull() ?: 0
             settle()
         }
     }
 
-    fun save() = (listOf(id, text(marks)) + listOf(undone, redone, checkpoints).map { it.joinToString(",", transform = ::text) })
+    fun save() = (listOf(id, text(marks)) + listOf(undone, redone, checkpoints).map { it.joinToString(",", transform = ::text) } + hints)
         .joinToString(":")
 
     private fun text(snapshot: IntArray) = snapshot.joinToString("")
@@ -119,6 +132,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         if (given(cell)) return false
         // The cells the previous action changed: this stroke may paint over those.
         // Not those it filled by itself, though: the player did not lay them, and a drag leaves them be.
+        redoable = redone.toList()
         repaint = (undone.lastOrNull()?.let { before -> marks.indices.filter { before[it] != marks[it] }.toSet() } ?: emptySet()) - filled
         record()
         first = cell
@@ -169,6 +183,12 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         last = to
         if (painted > 0) marks = new
         return painted
+    }
+
+    /** Takes back the stroke in progress as if it had never begun: the fingers were after something else. */
+    fun cancel() {
+        marks = undone.removeAt(undone.lastIndex)
+        redone += redoable
     }
 
     /** Ends the stroke: only now is the grid checked. True when this stroke solved it. */
@@ -261,6 +281,15 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     fun mistakes(): Set<Int> {
         val walls = solution ?: return emptySet()
         return marks.indices.filter { (marks[it] == WALL && !walls[it]) || (marks[it] == KNOWN_OPEN && walls[it]) }.toSet()
+    }
+
+    /**
+     * The plainest deduction the marks allow, see [app.oubliettes.game.hint]. Null when a mark is
+     * wrong: nothing can be built on it.
+     */
+    fun hint(): Step? {
+        hints++
+        return if (mistakes().isEmpty()) app.oubliettes.game.hint(puzzle, marks) else null
     }
 
     /** Empties the grid. An action like any other: Undo brings the marks back. */

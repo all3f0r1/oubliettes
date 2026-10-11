@@ -1,5 +1,7 @@
 package app.oubliettes
 
+import org.junit.Assert.assertNull
+import app.oubliettes.game.Rule
 import app.oubliettes.game.generate
 import app.oubliettes.game.tutorialPuzzle
 import app.oubliettes.game.tutorialSolution
@@ -267,5 +269,43 @@ class SessionTest {
         for (broken in listOf(null, "", "1", "1:", "1:123", "1:${"3".repeat(64)}", "x:$marks")) {
             assertTrue("$broken", Session(a, broken, legacyId = "1").marks.all { it == 0 })
         }
+    }
+
+    @Test
+    fun hintsFollowTheMarksAndAreCounted() {
+        val s = Session(tutorialPuzzle)
+        // The last row asks for six walls: the plainest thing to see on the empty grid.
+        val first = s.hint()!!
+        assertEquals(Rule.COUNT, first.rule)
+        assertTrue(first.walls.isNotEmpty() && first.walls.all { tutorialSolution[it] })
+        s.paint(first.walls, WALL)
+        assertTrue("on to something else", s.hint()!!.let { it.walls + it.open }.none { it in first.walls })
+        // A wrong mark, and no hint can build on the grid.
+        val open = tutorialSolution.indices.first { !tutorialSolution[it] && s.marks[it] == 0 && it !in tutorialPuzzle.monsters && it !in tutorialPuzzle.chests }
+        s.paint(listOf(open), WALL)
+        assertNull(s.hint())
+        assertEquals(3, s.hints)
+        assertEquals("kept with the grid", 3, Session(tutorialPuzzle, s.save()).hints)
+    }
+
+    @Test
+    fun aTryIsToldApartAndAStrokeCanBeTakenBack() {
+        val s = Session(tutorialPuzzle)
+        s.tap(c(0, 5))
+        assertEquals(emptySet<Int>(), s.tried)
+        s.checkpoint()
+        s.tap(c(1, 5))
+        s.tap(c(2, 5))
+        assertEquals(setOf(c(1, 5), c(2, 5)), s.tried)
+        s.undo()
+        // A second finger lands: the mark the first one laid is gone, and Redo is what it was.
+        val before = s.marks
+        s.begin(c(4, 5))
+        s.cancel()
+        assertTrue(before.contentEquals(s.marks))
+        s.redo()
+        assertEquals(setOf(c(1, 5), c(2, 5)), s.tried)
+        s.toCheckpoint()
+        assertEquals(emptySet<Int>(), s.tried)
     }
 }
