@@ -54,13 +54,14 @@ internal fun SharedPreferences.solved(size: Int) = all.keys.count { it.startsWit
 
 /**
  * Campaign levels per difficulty. The grids are frozen in res/raw/campaign.txt, one per line, the
- * 50 of each size in turn, from the one that asks for the least reasoning to the one that asks for
- * the most: they stay the same whatever becomes of the generator. Ten levels make a chapter, named
- * in CHAPTERS for each entry of SIZES. CAMPAIGN counts the campaigns there have been; the levels of a
- * former one are no longer played, and the dungeons solved in it are kept in the gallery.
+ * 50 of each size in turn, from the one that asks for the least [app.oubliettes.game.effort] to the
+ * one that asks for the most, hallways and treasure rooms in turn: they stay the same whatever
+ * becomes of the generator. Ten levels make a chapter, named in CHAPTERS for each entry of SIZES.
+ * CAMPAIGN counts the campaigns there have been; the levels of a former one are no longer played,
+ * and the dungeons solved in it are kept in the gallery.
  */
 internal const val LEVELS = 50
-internal const val CAMPAIGN = 2
+internal const val CAMPAIGN = 3
 internal val CHAPTERS = listOf(
     listOf("The Gatehouse", "The Guardroom", "The Kennels", "The Kitchens", "The Wine Cellar"),
     listOf("The Dungeons", "The Cells", "The Well", "The Old Sewers", "The Rat Warren"),
@@ -159,7 +160,7 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
     BackHandler(enabled = screen != Screen.MENU) {
         when {
             screen == Screen.SHARED || screen == Screen.GALLERY -> { size = 0; screen = Screen.ENDLESS }
-            (screen == Screen.CAMPAIGN || screen == Screen.DAILY || screen == Screen.TUTORIAL) && level != 0 -> level = 0
+            (screen == Screen.CAMPAIGN || screen == Screen.TUTORIAL) && level != 0 -> level = 0
             size != 0 && (screen == Screen.CAMPAIGN || screen == Screen.ENDLESS) -> size = 0
             else -> toMenu()
         }
@@ -171,7 +172,7 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
             val last = prefs.getString("last", "")!!.split(':')
             val lastSize = last.getOrNull(1)?.toIntOrNull()?.takeIf { it in SIZES }
             val lastLevel = last.getOrNull(2)?.toIntOrNull()?.takeIf { it in 1..LEVELS }
-            val lastDay = last.getOrNull(1)?.toLongOrNull()?.takeIf { last[0] == "D" && it in today - DAYS + 1..today }
+            val lastDay = last.getOrNull(1)?.toLongOrNull()?.takeIf { last[0] == "D" && it == today }
             val resume = when {
                 lastDay != null -> "Daily · ${dayName(lastDay)}"
                 last[0] == "S" && prefs.contains("shared") -> "A friend's dungeon"
@@ -186,7 +187,7 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
                 daily = dailyName(today), dailyDone = prefs.contains("dailyDone$today"),
                 onResume = {
                     size = lastSize ?: 0
-                    level = if (lastDay != null) (today - lastDay).toInt() + 1 else lastLevel ?: 0
+                    level = lastLevel ?: 0
                     screen = when {
                         lastDay != null -> Screen.DAILY
                         last[0] == "S" -> Screen.SHARED
@@ -228,7 +229,7 @@ private fun App(prefs: SharedPreferences, audio: Audio, campaign: Map<Int, List<
         } else {
             Endless(prefs, audio, size, reasoning) { size = 0 }
         }
-        Screen.DAILY -> Daily(prefs, audio, today, level, { level = it }, toMenu)
+        Screen.DAILY -> Daily(prefs, audio, today, toMenu)
         Screen.SHARED -> Shared(prefs, audio) { screen = Screen.ENDLESS }
         Screen.GALLERY -> Gallery(prefs) { screen = Screen.ENDLESS }
         Screen.TUTORIAL -> Lessons(prefs, audio, level, { level = it }, toMenu) { size = 0; level = 0; screen = Screen.CAMPAIGN }

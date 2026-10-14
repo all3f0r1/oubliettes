@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+**The campaign is a new one**: the levels solved or begun in the campaign of 0.8 are forgotten, and
+the dungeons solved in it go to the gallery.
+
+### Changed
+
+- The campaign has 250 new grids. In each difficulty the levels go from the one that asks for the
+  least work to the one that asks for the most, measured as hints measure it, and they take turns:
+  long hallways, branching ones, and treasure rooms, one or several. About half have a chest.
+- **Daily** opens today's dungeon only. Those of the days before are let go, marks and all; the ones
+  solved stay in the gallery and in the count.
+
 ## 0.8
 
 Saves, solved levels and settings of 0.7.3 are kept. Endless grids under way are kept too; the ones

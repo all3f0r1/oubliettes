@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,9 +44,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The daily dungeons that stay open: today's and those of the days before. A day missed costs nothing. */
-internal const val DAYS = 14
-
 // What each day of the week digs: a size, and an index in REASONINGS. Small and sharp, or large and gentle.
 private val DAILY = listOf(6 to 2, 8 to 1, 8 to 2, 10 to 0, 10 to 1, 12 to 0, 12 to 1)
 
@@ -70,64 +66,43 @@ internal fun SharedPreferences.keep(pictures: Collection<String>) {
 }
 
 /**
- * The table of the last [DAYS] days, or the dungeon of one of them when [ago] is not 0: 1 for
- * [today], 2 for the day before. A day's dungeon is dug from its date, so it is the same for every
- * player on this version of the game, and it is kept once dug: it never changes on this phone.
+ * Today's dungeon, and only it: those of the days before are let go, their marks with them. It is
+ * dug from the date, so it is the same for every player on this version of the game, and it is kept
+ * once dug: it never changes on this phone.
  */
 @Composable
-internal fun Daily(prefs: SharedPreferences, audio: Audio, today: Long, ago: Int, open: (Int) -> Unit, onMenu: () -> Unit) {
-    val mapped = prefs.all.keys.count { it.startsWith("dailyDone") }
-    if (ago == 0) {
-        Page("Daily", onMenu, spider = true) {
-            Plank("Today", dailyName(today), matter = Matter.GILDED, done = prefs.contains("dailyDone$today")) { open(1) }
-            Text("$mapped daily dungeons mapped", color = Dim)
-            Text("Earlier days stay open: none is ever lost.", color = Dim, fontSize = 15.sp, textAlign = TextAlign.Center)
-            for (week in (1 until DAYS).chunked(7)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (back in week) {
-                        val day = today - back
-                        val begun = prefs.getString("marksD$day", "")!!.split(':').getOrNull(1)?.any { it != '0' } == true
-                        LevelTile(LocalDate.ofEpochDay(day).dayOfMonth, prefs.getString("dailyDone$day", null), begun, Modifier.weight(1f)) { open(back + 1) }
-                    }
-                    // The last row is one short: today has its own plank.
-                    repeat(7 - week.size) { Row(Modifier.weight(1f)) {} }
-                }
-            }
-        }
-        return
-    }
-    val day = today - (ago - 1)
+internal fun Daily(prefs: SharedPreferences, audio: Audio, day: Long, onMenu: () -> Unit) {
     val (size, reasoning) = DAILY[day.mod(7)]
     val status = "${dayName(day)} · ${dailyName(day)}"
-    key(day) {
-        var puzzle by remember { mutableStateOf(prefs.getString("daily$day", null)?.let(::decodePuzzle)) }
-        var failed by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            prefs.edit().putString("last", "D:$day").apply()
-            if (puzzle != null) return@LaunchedEffect
-            val dug = withContext(Dispatchers.Default) { generate(size, size, day, reasoning = effortOf(size, reasoning)) { !isActive } }
-            if (dug == null) {
-                failed = true
-            } else {
-                prefs.edit().putString("daily$day", dug.encode()).apply()
-                puzzle = dug
-            }
-        }
-        val p = puzzle
-        if (p == null) {
-            Digging("Daily", status, { open(0) }, "Days", failed)
+    var puzzle by remember { mutableStateOf(prefs.getString("daily$day", null)?.let(::decodePuzzle)) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val editor = prefs.edit().putString("last", "D:$day")
+        for (key in prefs.all.keys) if (Regex("(daily|marksD)\\d+").matches(key) && key != "daily$day" && key != "marksD$day") editor.remove(key)
+        editor.apply()
+        if (puzzle != null) return@LaunchedEffect
+        val dug = withContext(Dispatchers.Default) { generate(size, size, day, reasoning = effortOf(size, reasoning)) { !isActive } }
+        if (dug == null) {
+            failed = true
         } else {
-            Game(
-                prefs, audio, "Daily", { open(0) }, back = "Days",
-                puzzle = p, saveKey = "marksD$day", legacyId = "",
-                variety = day.toInt(), status = status, solvedStatus = { "${prefs.all.keys.count { it.startsWith("dailyDone") }} daily dungeons mapped" },
-                next = "Days", onNext = { open(0) }, share = "Daily · $status",
-                onSolved = {
-                    prefs.edit().putString("dailyDone$day", it).apply()
-                    prefs.keep(listOf(it))
-                },
-            )
+            prefs.edit().putString("daily$day", dug.encode()).apply()
+            puzzle = dug
         }
+    }
+    val p = puzzle
+    if (p == null) {
+        Digging("Daily", status, onMenu, "Menu", failed)
+    } else {
+        Game(
+            prefs, audio, "Daily", onMenu,
+            puzzle = p, saveKey = "marksD$day", legacyId = "",
+            variety = day.toInt(), status = status, solvedStatus = { "${prefs.all.keys.count { it.startsWith("dailyDone") }} daily dungeons mapped" },
+            next = "Menu", onNext = onMenu, share = "Daily · $status",
+            onSolved = {
+                prefs.edit().putString("dailyDone$day", it).apply()
+                prefs.keep(listOf(it))
+            },
+        )
     }
 }
 

@@ -65,7 +65,8 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
 - **Campaign**: five difficulties, Novice (6×6), Easy (8×8), Medium (10×10), Hard (12×12) and Leeroy
   (14×14), with 50 levels each. The 250 grids ship with the app, so level *n* is the same grid for
   everyone and stays the same from one version to the next. In each difficulty the levels go from
-  the one that asks for the least reasoning to the one that asks for the most. You pick a difficulty, which shows how
+  the one that asks for the least work to the one that asks for the most, hallways and treasure
+  rooms in turn. You pick a difficulty, which shows how
   many of its levels are solved and bears a seal once they all are, then a level. All levels are
   open from the start; the table of levels shows which ones are begun, and a small picture of each
   dungeon you solved. Ten levels make a chapter, five to a difficulty, each with its name.
@@ -80,7 +81,7 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   the dungeon a friend sent with **Share**, which a solved grid offers: what it was, how many hints
   it took and the grid itself, never its solution.
 - **Daily**: one dungeon a day, dug from the date, so the same for every player on the same version
-  of the game. The last two weeks stay open, and a day missed costs nothing.
+  of the game. Only today's is open: a day missed costs nothing.
 - **Tutorial**: lessons, the basics first, then a technique each: treasure rooms, dead ends, narrow
   hallways, the dungeon in one piece, trying a cell out. A lesson is a small dungeon solved one
   deduction at a time, where you mark the cells of each step yourself or ask to be shown, then one

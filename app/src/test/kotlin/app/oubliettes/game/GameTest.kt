@@ -244,7 +244,7 @@ class GameTest {
     fun campaignIsFrozenAndSound() {
         val lines = File("src/main/res/raw/campaign.txt").readLines()
         assertEquals(250, lines.size)
-        assertEquals("the campaign changed: saves and solved levels of players would no longer match", 2122569899, lines.hashCode())
+        assertEquals("the campaign changed: saves and solved levels of players would no longer match", -1506467730, lines.hashCode())
         for ((index, line) in lines.withIndex()) {
             val p = decodePuzzle(line)!!
             assertEquals(listOf(6, 8, 10, 12, 14)[index / 50], p.width)
@@ -252,7 +252,12 @@ class GameTest {
             assertEquals("level ${index + 1}", 1, solutions(p, maxNodes = Int.MAX_VALUE)!!.size)
             assertEquals("level ${index + 1} solved without a guess", emptyList<Int>(), stuck(p))
         }
-        // Each size goes from the grid that asks for the least reasoning to the one that asks for the most.
-        for (levels in lines.chunked(50)) assertEquals(levels.map { probes(decodePuzzle(it)!!) }.sorted(), levels.map { probes(decodePuzzle(it)!!) })
+        // Each size goes from the grid that asks for the least work to the one that asks for the most.
+        for (levels in lines.chunked(50)) {
+            val efforts = levels.map { effort(steps(decodePuzzle(it)!!)!!) }
+            assertEquals(efforts.sorted(), efforts)
+        }
+        // Not only hallways: about half of the levels of each size have treasure rooms.
+        for (levels in lines.chunked(50)) assertTrue(levels.count { decodePuzzle(it)!!.chests.isNotEmpty() } in 20..35)
     }
 }
