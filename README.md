@@ -131,7 +131,8 @@ The loop and the sound effects are synthesised by `tools/make_audio.py` (needs n
 
 ## Install
 
-Download the APK from the [releases](https://github.com/all3f0r1/oubliettes/releases) and open it on your phone (Android 8.0+).
+Get it on [F-Droid](https://f-droid.org/packages/io.github.all3f0r1.oubliettes/), or download the APK from the
+[releases](https://github.com/all3f0r1/oubliettes/releases) and open it on your phone (Android 8.0+).
 
 ## Build
 
@@ -158,7 +159,7 @@ See the [changelog](CHANGELOG.md) for what each version brought.
 
 The store listing (descriptions, screenshots, per-version changelogs) lives in `metadata/`, in the
 layout F-Droid reads from the source repository. `fdroid/io.github.all3f0r1.oubliettes.yml` is the
-draft build recipe to submit to [fdroiddata](https://gitlab.com/fdroid/fdroiddata).
+build recipe, as published in [fdroiddata](https://gitlab.com/fdroid/fdroiddata).
 
 ## License
 
