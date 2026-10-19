@@ -120,7 +120,7 @@ internal fun Shared(prefs: SharedPreferences, audio: Audio, onBack: () -> Unit) 
         prefs, audio, "Shared", onBack, back = "Endless",
         puzzle = p, saveKey = "marksS", legacyId = "",
         variety = p.encode().hashCode(), status = status, solvedStatus = { status },
-        next = "Endless", onNext = onBack, share = "A friend's dungeon · ${p.width}×${p.width}",
+        next = "Endless", onNext = onBack,
         onSolved = { prefs.keep(listOf(it)) },
     )
 }

@@ -93,7 +93,8 @@ internal fun Checkpoints(session: Session, act: (() -> Unit) -> () -> Unit = { i
  *
  * A Hint plank, there unless turned off in Options and always when the grid is a [guide]d one, gives
  * the plainest deduction the marks allow, a word at a time: where to look, then why, then which
- * cells. It stays until those cells are marked. [share] names the grid to whoever a solved one is sent to.
+ * cells. It stays until those cells are marked. A non-null [share] enables sharing and names the grid
+ * to whoever a solved one is sent to. Only Daily and Endless opt in.
  */
 @Composable
 internal fun Game(
@@ -112,7 +113,7 @@ internal fun Game(
     onNext: () -> Unit,
     skip: String? = null,
     auto: Boolean = false,
-    share: String = status,
+    share: String? = null,
     guide: Boolean = false,
     onSolved: (picture: String) -> Unit,
 ) {
@@ -196,7 +197,7 @@ internal fun Game(
                 Planks {
                     PlankButton("Play again", onClick = act { session.reset(); audio.resume() })
                     PlankButton(next, onClick = onNext)
-                    PlankButton("Share", matter = Matter.PARCHMENT) {
+                    if (share != null) PlankButton("Share", matter = Matter.PARCHMENT) {
                         val text = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, shareText(share, session.hints, puzzle))
                         context.startActivity(Intent.createChooser(text, null))
                     }

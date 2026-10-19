@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Music starts on the launch screen once the app is resumed and its window has focus, respecting
+  the saved volume and other apps' audio.
+- Walls and hallway paving tile continuously in both directions, in all four stone palettes.
+  Paved cells no longer have a grid border; unknown cells keep theirs.
+- **Share** is offered only on solved Daily and Endless grids, not in Campaign, lessons or imported grids.
+
 ## 0.9
 
 **The campaign is a new one**: the levels solved or begun in the campaign of 0.8 are forgotten, and

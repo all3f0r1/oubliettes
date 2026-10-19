@@ -248,16 +248,17 @@ internal enum class Stone(val walls: List<Int>, val floors: List<Int>) {
 
 /**
  * The [ground] of a cell that is not a wall, at [left], [top]. Then the shade of the walls standing
- * right [above] it and on its left ([beside]), which is what gives them height, and a faint seam.
+ * right [above] it and on its left ([beside]), which is what gives them height. Only unknown cells
+ * get a grid seam: paved hallways and treasure rooms carry their stonework across cell boundaries.
  */
-private fun DrawScope.drawFloor(ground: Painter, left: Float, top: Float, cell: Float, above: Boolean, beside: Boolean) {
+private fun DrawScope.drawFloor(ground: Painter, left: Float, top: Float, cell: Float, above: Boolean, beside: Boolean, paved: Boolean) {
     translate(left, top) { with(ground) { draw(Size(cell, cell)) } }
     if (above) {
         drawRect(Shade, Offset(left, top), Size(cell, cell * 0.12f))
         drawRect(Shade, Offset(left, top), Size(cell, cell * 0.26f))
     }
     if (beside) drawRect(Shade, Offset(left, top), Size(cell * 0.1f, cell))
-    drawRect(Seam, Offset(left, top), Size(cell, cell), style = Stroke(1f))
+    if (!paved) drawRect(Seam, Offset(left, top), Size(cell, cell), style = Stroke(1f))
 }
 
 /**
@@ -491,6 +492,7 @@ internal fun Board(
                                 drawFloor(
                                     if (paved) paving[(i * 7 + variety).mod(paving.size)] else unknown, left, top, cell,
                                     above = i >= p.width && marks[i - p.width] == WALL, beside = i % p.width > 0 && marks[i - 1] == WALL,
+                                    paved = paved,
                                 )
                                 // The band of the cell touched last, over its row and its column.
                                 if (lit != null && (i / p.width == lit / p.width || i % p.width == lit % p.width)) {

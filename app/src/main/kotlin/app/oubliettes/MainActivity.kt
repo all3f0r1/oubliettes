@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
 import app.oubliettes.game.Puzzle
 import app.oubliettes.game.decodePuzzle
 
@@ -130,14 +131,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        audio.setForeground(true)
+    override fun onResume() {
+        super.onResume()
+        audio.setForeground(hasWindowFocus())
     }
 
-    override fun onStop() {
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Android 15+ only grants audio focus to the top app. At launch onStart is too early;
+        // the first focused window starts the music, without waiting for a tap or another screen.
+        if (hasFocus && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            audio.setForeground(true)
+        }
+    }
+
+    override fun onPause() {
         audio.setForeground(false)
-        super.onStop()
+        super.onPause()
     }
 
     override fun onDestroy() {

@@ -62,7 +62,7 @@ internal fun Lessons(prefs: SharedPreferences, audio: Audio, lesson: Int, open: 
             prefs, audio, technique.title, toTable, back = "Lessons",
             puzzle = technique.practise, saveKey = "marksL$index", legacyId = "",
             variety = index, status = "On your own", solvedStatus = { "Lesson learnt" },
-            next = "Lessons", onNext = toTable, share = "Lesson · ${technique.title}", guide = true,
+            next = "Lessons", onNext = toTable, guide = true,
             onSolved = { prefs.edit().putBoolean("lesson$index", true).apply() },
         )
     }
