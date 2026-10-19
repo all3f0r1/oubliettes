@@ -1,0 +1,3 @@
+- A new campaign of 250 grids, rising by effort, with treasure rooms; the levels of 0.8 go to the gallery
+- Daily opens today's dungeon only
+- New art: walls marked side by side join into one stretch of stone, a stone per difficulty, paved floors, redrawn monsters, chests, torches and icon

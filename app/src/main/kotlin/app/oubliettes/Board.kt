@@ -239,6 +239,11 @@ internal enum class Stone(val walls: List<Int>, val floors: List<Int>) {
         ),
         listOf(R.drawable.floor_depths_0, R.drawable.floor_depths_1, R.drawable.floor_depths_2, R.drawable.floor_depths_3),
     );
+
+    companion object {
+        /** One stone per difficulty, by the [size] of its grids; Leeroy goes down to the depths too, any other size stays in the dungeon. */
+        fun of(size: Int) = entries[SIZES.indexOf(size).coerceIn(0, entries.size - 1)]
+    }
 }
 
 /**
@@ -313,7 +318,7 @@ internal fun Board(
     locked: Boolean,
     celebrate: Boolean = false,
     variety: Int = 0,
-    stone: Stone = Stone.DUNGEON,
+    stone: Stone = Stone.of(session.puzzle.width),
     focus: List<Int> = emptyList(),
     toMark: Set<Int> = emptySet(),
     wrong: Set<Int> = emptySet(),

@@ -18,4 +18,10 @@ class WallMaskTest {
         assertEquals(1, wallNeighbourMask(7, 3, 3, marks))
         assertEquals(6, wallNeighbourMask(0, 3, 3, marks)) // corner: east and south
     }
+
+    @Test
+    fun stoneByDifficulty() {
+        assertEquals(listOf(Stone.DUNGEON, Stone.CISTERN, Stone.CRYPT, Stone.DEPTHS, Stone.DEPTHS), SIZES.map { Stone.of(it) })
+        assertEquals(Stone.DUNGEON, Stone.of(5)) // a lesson or a friend's grid of another size
+    }
 }

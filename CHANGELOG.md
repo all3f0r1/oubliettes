@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9
 
 **The campaign is a new one**: the levels solved or begun in the campaign of 0.8 are forgotten, and
 the dungeons solved in it go to the gallery.
@@ -13,7 +13,8 @@ the dungeons solved in it go to the gallery.
 - **Daily** opens today's dungeon only. Those of the days before are let go, marks and all; the ones
   solved stay in the gallery and in the count.
 - New art: walls marked side by side join into one stretch of stone, open floors are paved with
-  four layings of flagstones, and the monsters, chests, torches and app icon are redrawn.
+  four layings of flagstones, and the monsters, chests, torches and app icon are redrawn. Each
+  difficulty has its stone: lavender for Novice, wet green for Easy, ivory for Medium, mauve below.
 
 ## 0.8
 
