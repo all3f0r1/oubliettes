@@ -4,6 +4,7 @@ local.properties
 .idea/
 *.iml
 .kotlin/
+__pycache__/
 *.jks
 keystore.properties
 DESIGN.md
