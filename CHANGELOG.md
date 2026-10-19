@@ -12,6 +12,8 @@ the dungeons solved in it go to the gallery.
   long hallways, branching ones, and treasure rooms, one or several. About half have a chest.
 - **Daily** opens today's dungeon only. Those of the days before are let go, marks and all; the ones
   solved stay in the gallery and in the count.
+- New art: walls marked side by side join into one stretch of stone, open floors are paved with
+  four layings of flagstones, and the monsters, chests, torches and app icon are redrawn.
 
 ## 0.8
 

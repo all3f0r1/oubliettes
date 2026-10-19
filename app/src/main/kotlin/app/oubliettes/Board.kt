@@ -67,9 +67,8 @@ internal val Ink = Color(0xFFF2F0FA)
 internal val Dim = Color(0xFF8D8AA3)
 internal val Gold = Color(0xFFE0B84C)
 internal val Red = Color(0xFFFF6B57)
-private val Unknown = Color(0xFF24222D)
 internal val OpenFloor = Color(0xFF3D3A4E)
-private val Joint = Color(0xFF312E40) // between the flagstones of an open floor
+private val Seam = Color(0x24000000) // around every cell that is not a wall: walls run into each other
 private val Shade = Color(0x47000000) // what stands above the floor darkens it
 private val Vignette = Color(0x2E000000)
 private val Parchment = Color(0xFFEAD9B0) // what a try is written on
@@ -181,26 +180,79 @@ internal fun DrawScope.drawMonster(
 }
 
 /**
- * The flagstones of an open cell at [left], [top]: one of four layings, by its [seed]. Then the shade
- * of the walls standing right [above] it and on its left ([beside]), which is what gives them height.
+ * Which of its four neighbours, among the walls the player marked, the wall at [index] joins: north 1,
+ * east 2, south 4, west 8. It picks the tile, so it must never look at the solution.
  */
-private fun DrawScope.drawFloor(seed: Int, left: Float, top: Float, cell: Float, paved: Boolean, above: Boolean, beside: Boolean) {
-    val joint = cell * 0.035f
-    fun across(y: Float, from: Float = 0f, to: Float = 1f) =
-        drawLine(Joint, Offset(left + 1 + (cell - 2) * from, top + cell * y), Offset(left + 1 + (cell - 2) * to, top + cell * y), joint)
-    fun down(x: Float, from: Float = 0f, to: Float = 1f) =
-        drawLine(Joint, Offset(left + cell * x, top + 1 + (cell - 2) * from), Offset(left + cell * x, top + 1 + (cell - 2) * to), joint)
-    if (paved) when (seed.mod(4)) {
-        0 -> { across(0.5f); down(0.36f, to = 0.5f); down(0.66f, from = 0.5f) }
-        1 -> { down(0.5f); across(0.38f, to = 0.5f); across(0.64f, from = 0.5f) }
-        2 -> { across(0.62f); down(0.55f, from = 0.62f) }
-        else -> { across(0.34f); down(0.42f, to = 0.34f) }
-    }
+internal fun wallNeighbourMask(index: Int, width: Int, height: Int, marks: IntArray): Int {
+    val x = index % width
+    val y = index / width
+    var mask = 0
+    if (y > 0 && marks[index - width] == WALL) mask = mask or 1
+    if (x + 1 < width && marks[index + 1] == WALL) mask = mask or 2
+    if (y + 1 < height && marks[index + width] == WALL) mask = mask or 4
+    if (x > 0 && marks[index - 1] == WALL) mask = mask or 8
+    return mask
+}
+
+/**
+ * The stone a dungeon is built of. Its [walls] are one tile per [wallNeighbourMask], each joining its
+ * neighbours without a seam; its [floors] are four layings of flagstones. It changes nothing a mark means.
+ */
+internal enum class Stone(val walls: List<Int>, val floors: List<Int>) {
+    /** Lavender and dark violet. */
+    DUNGEON(
+        listOf(
+            R.drawable.wall_dungeon_m00, R.drawable.wall_dungeon_m01, R.drawable.wall_dungeon_m02, R.drawable.wall_dungeon_m03,
+            R.drawable.wall_dungeon_m04, R.drawable.wall_dungeon_m05, R.drawable.wall_dungeon_m06, R.drawable.wall_dungeon_m07,
+            R.drawable.wall_dungeon_m08, R.drawable.wall_dungeon_m09, R.drawable.wall_dungeon_m10, R.drawable.wall_dungeon_m11,
+            R.drawable.wall_dungeon_m12, R.drawable.wall_dungeon_m13, R.drawable.wall_dungeon_m14, R.drawable.wall_dungeon_m15,
+        ),
+        listOf(R.drawable.floor_dungeon_0, R.drawable.floor_dungeon_1, R.drawable.floor_dungeon_2, R.drawable.floor_dungeon_3),
+    ),
+    /** Wet stone, grey green. */
+    CISTERN(
+        listOf(
+            R.drawable.wall_cistern_m00, R.drawable.wall_cistern_m01, R.drawable.wall_cistern_m02, R.drawable.wall_cistern_m03,
+            R.drawable.wall_cistern_m04, R.drawable.wall_cistern_m05, R.drawable.wall_cistern_m06, R.drawable.wall_cistern_m07,
+            R.drawable.wall_cistern_m08, R.drawable.wall_cistern_m09, R.drawable.wall_cistern_m10, R.drawable.wall_cistern_m11,
+            R.drawable.wall_cistern_m12, R.drawable.wall_cistern_m13, R.drawable.wall_cistern_m14, R.drawable.wall_cistern_m15,
+        ),
+        listOf(R.drawable.floor_cistern_0, R.drawable.floor_cistern_1, R.drawable.floor_cistern_2, R.drawable.floor_cistern_3),
+    ),
+    /** Aged ivory, dark floor. */
+    CRYPT(
+        listOf(
+            R.drawable.wall_crypt_m00, R.drawable.wall_crypt_m01, R.drawable.wall_crypt_m02, R.drawable.wall_crypt_m03,
+            R.drawable.wall_crypt_m04, R.drawable.wall_crypt_m05, R.drawable.wall_crypt_m06, R.drawable.wall_crypt_m07,
+            R.drawable.wall_crypt_m08, R.drawable.wall_crypt_m09, R.drawable.wall_crypt_m10, R.drawable.wall_crypt_m11,
+            R.drawable.wall_crypt_m12, R.drawable.wall_crypt_m13, R.drawable.wall_crypt_m14, R.drawable.wall_crypt_m15,
+        ),
+        listOf(R.drawable.floor_crypt_0, R.drawable.floor_crypt_1, R.drawable.floor_crypt_2, R.drawable.floor_crypt_3),
+    ),
+    /** Mauve, violet depths. */
+    DEPTHS(
+        listOf(
+            R.drawable.wall_depths_m00, R.drawable.wall_depths_m01, R.drawable.wall_depths_m02, R.drawable.wall_depths_m03,
+            R.drawable.wall_depths_m04, R.drawable.wall_depths_m05, R.drawable.wall_depths_m06, R.drawable.wall_depths_m07,
+            R.drawable.wall_depths_m08, R.drawable.wall_depths_m09, R.drawable.wall_depths_m10, R.drawable.wall_depths_m11,
+            R.drawable.wall_depths_m12, R.drawable.wall_depths_m13, R.drawable.wall_depths_m14, R.drawable.wall_depths_m15,
+        ),
+        listOf(R.drawable.floor_depths_0, R.drawable.floor_depths_1, R.drawable.floor_depths_2, R.drawable.floor_depths_3),
+    );
+}
+
+/**
+ * The [ground] of a cell that is not a wall, at [left], [top]. Then the shade of the walls standing
+ * right [above] it and on its left ([beside]), which is what gives them height, and a faint seam.
+ */
+private fun DrawScope.drawFloor(ground: Painter, left: Float, top: Float, cell: Float, above: Boolean, beside: Boolean) {
+    translate(left, top) { with(ground) { draw(Size(cell, cell)) } }
     if (above) {
-        drawRect(Shade, Offset(left + 1, top + 1), Size(cell - 2, cell * 0.12f))
-        drawRect(Shade, Offset(left + 1, top + 1), Size(cell - 2, cell * 0.26f))
+        drawRect(Shade, Offset(left, top), Size(cell, cell * 0.12f))
+        drawRect(Shade, Offset(left, top), Size(cell, cell * 0.26f))
     }
-    if (beside) drawRect(Shade, Offset(left + 1, top + 1), Size(cell * 0.1f, cell - 2))
+    if (beside) drawRect(Shade, Offset(left, top), Size(cell * 0.1f, cell))
+    drawRect(Seam, Offset(left, top), Size(cell, cell), style = Stroke(1f))
 }
 
 /**
@@ -244,7 +296,7 @@ internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: F
  * [Session.begin]). Dragging paints the value set by the first cell, along its row or column (see
  * [Session.dragTo]); only the finger that started a stroke draws it. [onPaint]
  * is called every time cells were painted, [onStroke] once the stroke is over, with whether it solved
- * the grid. [variety] picks which monsters and wall tiles a grid shows; [focus] cells get a gold
+ * the grid. [variety] picks which monsters and flagstones a grid shows, [stone] what it is built of; [focus] cells get a gold
  * outline, and those among them still [toMark] are said so to screen readers. [wrong] cells are
  * crossed in red. [celebrate] shows the finished dungeon: no dots, monsters on the alert, chest pulsing.
  * The cells of the try under way, see [Session.tried], bear a parchment corner. A tap on a count is [onCount].
@@ -261,6 +313,7 @@ internal fun Board(
     locked: Boolean,
     celebrate: Boolean = false,
     variety: Int = 0,
+    stone: Stone = Stone.DUNGEON,
     focus: List<Int> = emptyList(),
     toMark: Set<Int> = emptySet(),
     wrong: Set<Int> = emptySet(),
@@ -271,12 +324,9 @@ internal fun Board(
 ) {
     val p = session.puzzle
     val marks = session.marks
-    // Mostly plain bricks, so the odd cracked or mossy one reads as detail rather than noise.
-    val plain = painterResource(R.drawable.wall)
-    val walls = listOf(
-        plain, painterResource(R.drawable.wall_worn), plain, painterResource(R.drawable.wall_cracked),
-        plain, painterResource(R.drawable.wall_chipped), painterResource(R.drawable.wall_mossy),
-    )
+    val walls = stone.walls.map { painterResource(it) }
+    val paving = stone.floors.map { painterResource(it) }
+    val unknown = painterResource(R.drawable.cell_unknown)
     val chest = chestFrames()
     val bodies = monsterBodies()
     val tick = rememberTick()
@@ -431,22 +481,21 @@ internal fun Board(
                             val left = (i % p.width + 1) * cell
                             val top = (i / p.width + 1) * cell
                             val given = i in p.chests || i in p.monsters
-                            val floor = if (given || marks[i] == KNOWN_OPEN || (celebrate && marks[i] != WALL)) OpenFloor else Unknown
-                            drawRect(floor, Offset(left + 1, top + 1), Size(cell - 2, cell - 2))
-                            // The band of the cell touched last, over its row and its column.
-                            if (lit != null && (i / p.width == lit / p.width || i % p.width == lit % p.width)) {
-                                drawRect(band, Offset(left + 1, top + 1), Size(cell - 2, cell - 2))
-                            }
+                            val paved = given || marks[i] == KNOWN_OPEN || celebrate
                             if (marks[i] != WALL) {
                                 drawFloor(
-                                    i * 7 + variety, left, top, cell, paved = floor == OpenFloor,
+                                    if (paved) paving[(i * 7 + variety).mod(paving.size)] else unknown, left, top, cell,
                                     above = i >= p.width && marks[i - p.width] == WALL, beside = i % p.width > 0 && marks[i - 1] == WALL,
                                 )
+                                // The band of the cell touched last, over its row and its column.
+                                if (lit != null && (i / p.width == lit / p.width || i % p.width == lit % p.width)) {
+                                    drawRect(band, Offset(left, top), Size(cell, cell))
+                                }
                             }
                             // Celebration: monsters stand on the alert, chests pulse.
                             val moving = beat != null && marks[i] != WALL
                             when {
-                                marks[i] == WALL -> translate(left, top) { with(walls[(i * 5 + variety).mod(walls.size)]) { draw(Size(cell, cell)) } }
+                                marks[i] == WALL -> translate(left, top) { with(walls[wallNeighbourMask(i, p.width, p.height, marks)]) { draw(Size(cell, cell)) } }
                                 i in p.chests -> translate(left, top) {
                                     drawShadow(cell)
                                     val pulse = if (moving) 1f + 0.1f * sin(2 * PI.toFloat() * t) else 1f
