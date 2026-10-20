@@ -1,6 +1,5 @@
 package app.oubliettes
 
-import org.junit.Assert.assertNull
 import app.oubliettes.game.Rule
 import app.oubliettes.game.generate
 import app.oubliettes.game.tutorialPuzzle
@@ -117,7 +116,7 @@ class SessionTest {
         s.dragTo(0, 5)
         s.end()
         assertEquals("the dot that filled by itself stays", "112101", s.column(0))
-        assertEquals("the row the drag ended on needs every cell", "111111", s.row(5))
+        assertEquals("a column drag leaves its perpendicular row alone", "100001", s.row(5))
         assertEquals("not the rows it went through", "100001", s.row(3))
         s.tap(c(1, 2)) // a dot back to unknown: it does not fill again
         assertEquals("202221", s.row(2))
@@ -280,12 +279,56 @@ class SessionTest {
         assertTrue(first.walls.isNotEmpty() && first.walls.all { tutorialSolution[it] })
         s.paint(first.walls, WALL)
         assertTrue("on to something else", s.hint()!!.let { it.walls + it.open }.none { it in first.walls })
-        // A wrong mark, and no hint can build on the grid.
+        // A wrong mark elsewhere must not turn hints into a check of the whole grid.
+        val expected = s.hint()!!
         val open = tutorialSolution.indices.first { !tutorialSolution[it] && s.marks[it] == 0 && it !in tutorialPuzzle.monsters && it !in tutorialPuzzle.chests }
         s.paint(listOf(open), WALL)
-        assertNull(s.hint())
-        assertEquals(3, s.hints)
-        assertEquals("kept with the grid", 3, Session(tutorialPuzzle, s.save()).hints)
+        val actual = s.hint()!!
+        assertEquals(expected.rule, actual.rule)
+        assertEquals(expected.from, actual.from)
+        assertEquals(expected.walls to expected.open, actual.walls to actual.open)
+        assertEquals(4, s.hints)
+        assertEquals("kept with the grid", 4, Session(tutorialPuzzle, s.save()).hints)
+    }
+
+    @Test
+    fun horizontalDragDoesNotFillTheLastColumn() {
+        val s = Session(tutorialPuzzle, completes = true)
+        s.begin(c(0, 2), KNOWN_OPEN)
+        s.dragTo(4, 2)
+        s.end()
+        assertEquals("222221", s.row(2))
+        assertEquals("the automatic wall leaves column 5 alone", "001000", s.column(5))
+        assertEquals("the last painted cell leaves column 4 alone", "002000", s.column(4))
+        s.undo()
+        assertTrue(s.marks.all { it == 0 })
+        s.redo()
+        assertEquals("222221", s.row(2))
+        assertEquals("001000", s.column(5))
+    }
+
+    @Test
+    fun tapDoesNotCascadeBeyondItsTwoLines() {
+        val s = Session(tutorialPuzzle, completes = true)
+        s.tap(c(5, 2))
+        assertEquals("222221", s.row(2))
+        assertEquals("111111", s.column(5))
+        assertEquals("row 5 became forced by the column fill but must stay untouched", "000001", s.row(5))
+        val restored = Session(tutorialPuzzle, s.save(), completes = true)
+        assertEquals(s.marks.toList(), restored.marks.toList())
+        restored.undo()
+        assertTrue(restored.marks.all { it == 0 })
+    }
+
+    @Test
+    fun paintDoesNotInheritThePreviousDragAxis() {
+        val s = Session(tutorialPuzzle, completes = true)
+        s.begin(c(0, 0), KNOWN_OPEN)
+        s.dragTo(1, 0)
+        s.end()
+        s.paint(listOf(c(5, 2)), WALL)
+        assertEquals("222221", s.row(2))
+        assertEquals("111111", s.column(5))
     }
 
     @Test

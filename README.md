@@ -34,9 +34,9 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   cells, plus the cells of your previous action (drag again over a drag to fix it). Older marks are
   never overwritten. However fast the finger goes, every cell it crosses is filled, and only the
   finger that started a drag draws.
-- The row and the column of the cell you marked last are finished for you once their unknown cells
+- A drag finishes only its own row or column; a tap can finish its row and column independently once their unknown cells
   can only be filled one way: all open when the line has its walls, all walls when it needs every one
-  of them. The lines this fills are left to you, and the whole of it is one action for Undo. Erasing
+  of them. Automatic marks never trigger another line, and the whole of it is one action for Undo. Erasing
   a mark finishes nothing.
 - The two arrows under the grid undo the last action (a whole drag counts as one) and redo it.
   The round arrow over the grid resets it after asking, and is an action like any other: Undo restores the marks.
@@ -49,10 +49,10 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
 - The row and the column of the cell touched last are lit up to their counts. On grids whose cells
   are smaller than a fingertip (10×10 and up on a phone), a magnifier shows what is under the
   finger.
-- **Hint** gives the plainest deduction your marks allow, a word at a time: where to look, then why,
+- **Hint** follows deductions from the puzzle clues, a word at a time: where to look, then why,
   then which cells, outlined in gold until they are marked. When no rule gives a cell it names the
-  one to try, and which rule the try breaks. With a wrong mark on the grid it only says so, and
-  shows it if asked.
+  one to try, and which rule the try breaks. It skips steps you have already marked, without checking
+  your marks for mistakes. Only the optional **Check** action checks mistakes.
 - The cells laid since the latest checkpoint bear a parchment corner: a try is told apart from what
   is sure.
 - On grids with small cells, two fingers spread the grid and move it; the counts stay along the
@@ -69,7 +69,8 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   rooms in turn. You pick a difficulty, which shows how
   many of its levels are solved and bears a seal once they all are, then a level. All levels are
   open from the start; the table of levels shows which ones are begun, and a small picture of each
-  dungeon you solved. Ten levels make a chapter, five to a difficulty, each with its name.
+  dungeon you solved. **Next level** skips levels already solved; when none remains after the current
+  level, it returns to the level list. Ten levels make a chapter, five to a difficulty, each with its name.
 - **Endless**: randomly generated grids of the size and of the reasoning you pick first: Gentle, Tricky or
   Fiendish, by the deductions solving them takes: which rules, how many cells have to be tried and how far each try has to be followed. Once a grid is solved the next one comes by itself, until you
   walk out. A grid counts as solved the moment it
@@ -78,7 +79,7 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   another grid) rather than search forever.
   Dungeons come in several shapes: winding hallways, branches and dead ends, or more treasure rooms.
   **Gallery** keeps the dungeons solved in Endless, in Daily and from a friend. **Enter a code** digs
-  the dungeon a friend sent with **Share**, which solved Daily and Endless grids offer: what it was, how many hints
+  the dungeon a friend sent with **Share**, offered on solved Daily and Endless grids: what it was, how many hints
   it took and the grid itself, never its solution.
 - **Daily**: one dungeon a day, dug from the date, so the same for every player on the same version
   of the game. Only today's is open: a day missed costs nothing.
@@ -94,7 +95,7 @@ fingerprint of its grid, and Endless saves the grid itself: marks can never land
 ## Options
 
 - Vibration on every mark, and keeping the screen on while a grid is shown.
-- Finishing the row and the column marked last once they can only be filled one way (on by default).
+- Finishing the marked line once it can only be filled one way (on by default; a tap can finish both axes).
 - Being told when every count is met but a rule is broken (on by default; it never says which rule
   or where).
 - Hints (on by default): the **Hint** plank under the grid.

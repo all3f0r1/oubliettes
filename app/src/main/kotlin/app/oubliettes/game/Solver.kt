@@ -356,11 +356,19 @@ internal fun probes(p: Puzzle): Int = with(Deducer(p)) {
 }
 
 /**
- * The plainest deduction the [marks] of a player allow on [p]: 0 for a cell left unknown, 1 for a
- * wall, 2 for an open one. Null when there is none, which is also what marks that break a rule give.
+ * The first deduction from the clues of [p] not yet marked by the player: 0 for unknown, 1 for a
+ * wall, 2 for open. Player marks only skip completed steps; they are never premises or checked for
+ * mistakes. An unrelated wrong mark therefore cannot turn a hint into an error detector.
  */
 fun hint(p: Puzzle, marks: IntArray): Step? = with(Deducer(p)) {
-    step(IntArray(n) { if (it in p.monsters || it in p.chests) OPEN else marks[it] })
+    val c = start
+    while (0 in c) {
+        val next = step(c) ?: return@with null
+        if (next.walls.any { marks[it] != WALL } || next.open.any { marks[it] != OPEN }) return@with next
+        next.walls.forEach { c[it] = WALL }
+        next.open.forEach { c[it] = OPEN }
+    }
+    null
 }
 
 /**
