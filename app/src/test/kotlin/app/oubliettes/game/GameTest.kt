@@ -6,6 +6,7 @@ import kotlin.system.measureTimeMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -233,9 +234,9 @@ class GameTest {
         }
         // Cells cut off are nearly always dead ends first, and both ways of a cell rarely agree: no grid here needs them.
         assertTrue("rules seen: $seen", seen.containsAll(Rule.entries - Rule.CUT - Rule.EITHER))
-        // Marks that break a rule give no hint, and neither does a grid with nothing left to find.
+        // Even conflicting marks receive a clue-based hint; a finished grid needs none.
         val p = generate(8, 8, 1)!!
-        assertNull(hint(p, IntArray(64) { 1 }))
+        assertNotNull(hint(p, IntArray(64) { 1 }))
         assertNull(hint(p, solutions(p)!!.single().let { walls -> IntArray(64) { if (walls[it]) 1 else 2 } }))
     }
 

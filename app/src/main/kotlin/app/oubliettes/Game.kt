@@ -92,9 +92,9 @@ internal fun Checkpoints(session: Session, act: (() -> Unit) -> () -> Unit = { i
  * then rests for a minute.
  *
  * A Hint plank, there unless turned off in Options and always when the grid is a [guide]d one, gives
- * the plainest deduction the marks allow, a word at a time: where to look, then why, then which
- * cells. It stays until those cells are marked. A non-null [share] enables sharing and names the grid
- * to whoever a solved one is sent to. Only Daily and Endless opt in.
+ * a deduction from the puzzle clues, a word at a time: where to look, then why, then which cells.
+ * It never checks for mistakes. It stays until those cells are marked. A non-null [share] enables
+ * sharing and names the grid to whoever a solved one is sent to. Only Daily and Endless opt in.
  */
 @Composable
 internal fun Game(
@@ -136,8 +136,7 @@ internal fun Game(
         delay(57_000)
         checked = false
     }
-    // The hint being given, and how far it went: 1 where to look, 2 why, 3 which cells. A level
-    // without a hint is a grid no hint can be given on: a mark is wrong.
+    // The hint being given, and how far it went: 1 where to look, 2 why, 3 which cells.
     var hint by remember(session) { mutableStateOf<Step?>(null) }
     var hintLevel by remember(session) { mutableIntStateOf(0) }
     val marks = session.marks
@@ -212,10 +211,9 @@ internal fun Game(
                 Planks {
                     Checkpoints(session, ::act)
                     if (hints) {
-                        val wrongMark = level > 0 && step == null
                         PlankButton(
-                            if (level == 0) "Hint" else if (level == 1 && !wrongMark) "Why?" else "Show me",
-                            enabled = level < if (wrongMark) 2 else 3, matter = Matter.PARCHMENT,
+                            if (level == 0) "Hint" else if (level == 1 && step != null) "Why?" else "Show me",
+                            enabled = level == 0 || (step != null && level < 3), matter = Matter.PARCHMENT,
                         ) {
                             if (level == 0) {
                                 hint = session.hint()
@@ -223,7 +221,6 @@ internal fun Game(
                                 prefs.edit().putString(saveKey, session.save()).apply()
                             } else {
                                 hintLevel = level + 1
-                                if (wrongMark) wrong = session.mistakes()
                             }
                         }
                     }
@@ -252,7 +249,7 @@ internal fun Game(
                 val found = wrong?.let { if (it.isEmpty()) "No mistake so far." else if (it.size == 1) "1 mistake, crossed out." else "${it.size} mistakes, crossed out." }
                 val said = found ?: when {
                     level == 0 -> null
-                    step == null -> "A mark is wrong: no hint can build on it."
+                    step == null -> "No further deduction is available. Try a checkpoint and explore a possibility."
                     level == 1 -> step.nudge(puzzle)
                     else -> step.reason(puzzle)
                 }

@@ -24,14 +24,15 @@ private const val HISTORY = 50
  * of [dragTo], then [end]. [saved] is what [save] returned earlier; it is ignored unless it was made
  * for this exact puzzle. [legacyId] is what saves of 0.4 were tagged with instead: the seed.
  *
- * With [completes], the row and the column of the cell the player marked last are finished for them
- * once their unknown cells can only be filled one way: all open when the line has its walls, all walls
- * when it needs every one of them.
+ * With [completes], a drag finishes only its own line; a tap can finish its row and column
+ * independently once their unknown cells can only be filled one way: all open when the line has
+ * its walls, all walls when it needs every one of them. Automatic marks never trigger other lines.
  *
  * A [checkpoint] remembers the marks before the player tries something out, when deduction runs dry;
  * [toCheckpoint] brings back the latest one. They pile up, one per try within a try.
  *
- * A [hint] is the plainest deduction the marks allow; how many were asked for is kept with the grid.
+ * A [hint] follows deductions from the puzzle clues, without checking the player's mistakes;
+ * how many were asked for is kept with the grid.
  */
 internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: String? = null, private val completes: Boolean = false) {
     private val width = puzzle.width
@@ -206,23 +207,25 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     }
 
     /**
-     * Finishes the row and the column of the cell marked last, and no other: the lines this fills are
-     * left to the player. Erasing a mark finishes nothing, or the cell would fill again at once.
+     * Finishes only the stroke's line. A tap may finish its row and column independently, using the
+     * same marks before either fill: automatic marks never trigger a perpendicular fill.
+     * Erasing a mark finishes nothing, or the cell would fill again at once.
      * Returns the cells it filled.
      */
     private fun complete(): Set<Int> {
         if (marks[latest] == 0) return emptySet()
-        val new = marks.copyOf()
+        val before = marks
+        val new = before.copyOf()
         val done = mutableSetOf<Int>()
         val x = latest % width
         val y = latest / width
-        val lines = listOf(
-            (0 until width).map { y * width + it } to puzzle.rowCounts[y],
-            (0 until puzzle.height).map { it * width + x } to puzzle.colCounts[x],
-        )
+        val lines = buildList {
+            if (alongRow != false) add((0 until width).map { y * width + it } to puzzle.rowCounts[y])
+            if (alongRow != true) add((0 until puzzle.height).map { it * width + x } to puzzle.colCounts[x])
+        }
         for ((line, count) in lines) {
-            val unknown = line.filter { new[it] == 0 && !given(it) }
-            val walls = line.count { new[it] == WALL }
+            val unknown = line.filter { before[it] == 0 && !given(it) }
+            val walls = line.count { before[it] == WALL }
             val value = when (count) {
                 walls -> KNOWN_OPEN
                 walls + unknown.size -> WALL
@@ -245,6 +248,7 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
         if (new.contentEquals(marks)) return false
         record()
         marks = new
+        alongRow = null
         return end()
     }
 
@@ -284,12 +288,12 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     }
 
     /**
-     * The plainest deduction the marks allow, see [app.oubliettes.game.hint]. Null when a mark is
-     * wrong: nothing can be built on it.
+     * A deduction from the clues, see [app.oubliettes.game.hint]. The optional Check action alone
+     * checks mistakes; hints never report whether the grid contains one.
      */
     fun hint(): Step? {
         hints++
-        return if (mistakes().isEmpty()) app.oubliettes.game.hint(puzzle, marks) else null
+        return app.oubliettes.game.hint(puzzle, marks)
     }
 
     /** Empties the grid. An action like any other: Undo brings the marks back. */

@@ -50,7 +50,8 @@ internal fun Campaign(prefs: SharedPreferences, audio: Audio, levels: List<Puzzl
             puzzle = levels[level - 1], saveKey = "marks${size}_$level", legacyId = "$level",
             variety = level, status = "${difficulty(size)} · Level $level",
             solvedStatus = { "${difficulty(size)} · ${prefs.solved(size)} / $LEVELS solved" },
-            next = if (level < LEVELS) "Next level" else "Levels", onNext = { open(if (level < LEVELS) level + 1 else 0) },
+            next = if (nextCampaignLevel(level, levels.size) { prefs.contains("done${size}_$it") } != 0) "Next level" else "Levels",
+            onNext = { open(nextCampaignLevel(level, levels.size) { prefs.contains("done${size}_$it") }) },
             onSolved = { prefs.edit().putString("done${size}_$level", it).apply() },
         )
         return
