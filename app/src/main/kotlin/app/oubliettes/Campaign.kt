@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,23 +37,48 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.oubliettes.game.Puzzle
 import kotlin.math.sqrt
 
+// These Easy grids all have a single-exit deduction in the solver's trace.
+private val TreasureTrail = linkedMapOf(
+    6 to "Every treasure room has exactly one exit. Look for the wall counts that leave it open.",
+    11 to "Find the room first, then use its wall counts to work out which side can open.",
+    20 to "Trace the narrow hallways to see which entrance can connect the room to the dungeon.",
+)
+private const val TREASURE_TRAIL_SIZE = 8
+
 /** The table of levels of the difficulty [size], or the level being played when [level] is not 0. */
 @Composable
 internal fun Campaign(prefs: SharedPreferences, audio: Audio, levels: List<Puzzle>, size: Int, level: Int, open: (Int) -> Unit, onBack: () -> Unit) {
+    var followingTrail by rememberSaveable(size) { mutableStateOf(false) }
+    val trail = TreasureTrail.keys.toList()
+    val stage = if (size == TREASURE_TRAIL_SIZE && followingTrail) trail.indexOf(level) else -1
+    fun mapped(candidate: Int) = prefs.contains("done${size}_$candidate")
     if (level != 0) {
+        val following = if (stage >= 0) trail.getOrNull(stage + 1) ?: 0 else nextCampaignLevel(level, levels.size, ::mapped)
         LaunchedEffect(size, level) { prefs.edit().putString("last", "C:$size:$level").apply() }
         Game(
             prefs, audio, "Campaign", onBack = { open(0) }, back = "Levels",
             puzzle = levels[level - 1], saveKey = "marks${size}_$level", legacyId = "$level",
             variety = level, status = "${difficulty(size)} · Level $level",
-            solvedStatus = { "${difficulty(size)} · ${prefs.solved(size)} / $LEVELS solved" },
-            next = if (nextCampaignLevel(level, levels.size) { prefs.contains("done${size}_$it") } != 0) "Next level" else "Levels",
-            onNext = { open(nextCampaignLevel(level, levels.size) { prefs.contains("done${size}_$it") }) },
+            objective = TreasureTrail[level].takeIf { stage >= 0 },
+            solvedStatus = {
+                if (stage >= 0) {
+                    if (trail.all(::mapped)) "Treasure trail complete" else "Treasure trail · ${trail.count(::mapped)} of ${trail.size} mapped"
+                } else {
+                    "${difficulty(size)} · ${prefs.solved(size)} / $LEVELS solved"
+                }
+            },
+            next = when {
+                following == 0 -> "Levels"
+                stage >= 0 -> "Next in trail"
+                else -> "Next level"
+            },
+            onNext = { open(following) },
             onSolved = { prefs.edit().putString("done${size}_$level", it).apply() },
         )
         return
@@ -63,6 +90,30 @@ internal fun Campaign(prefs: SharedPreferences, audio: Audio, levels: List<Puzzl
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (size == TREASURE_TRAIL_SIZE) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("The treasure trail", Modifier.semantics { heading() }, color = Gold, fontFamily = Fraktur, fontSize = 22.sp)
+                        Text("Three dungeons to master the single exit of a treasure room.", color = Ink, textAlign = TextAlign.Center)
+                        Planks {
+                            for ((index, candidate) in trail.withIndex()) {
+                                val label = listOf("Find it", "Follow it", "Connect it")[index]
+                                PlankButton(
+                                    if (mapped(candidate)) "$label ✓" else label,
+                                    matter = Matter.PARCHMENT,
+                                    description = "$label, level $candidate" + if (mapped(candidate)) ", mapped" else "",
+                                ) {
+                                    followingTrail = true
+                                    open(candidate)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             for ((chapter, name) in CHAPTERS[SIZES.indexOf(size)].withIndex()) {
                 val mapped = (1..10).count { prefs.contains("done${size}_${chapter * 10 + it}") }
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -80,7 +131,10 @@ internal fun Campaign(prefs: SharedPreferences, audio: Audio, levels: List<Puzzl
                     val done = prefs.getString("done${size}_${index + 1}", null)?.takeIf { it.length == size * size }
                     // A save holds its marks after the first colon: begun once any cell is marked.
                     val begun = prefs.getString("marks${size}_${index + 1}", "")!!.split(':').getOrNull(1)?.any { it != '0' } == true
-                    LevelTile(index + 1, done, begun) { open(index + 1) }
+                    LevelTile(index + 1, done, begun) {
+                        followingTrail = false
+                        open(index + 1)
+                    }
                 }
             }
         }

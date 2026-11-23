@@ -1,6 +1,5 @@
 package app.oubliettes
 
-import android.content.Intent
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,13 +21,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -115,6 +114,7 @@ internal fun Game(
     auto: Boolean = false,
     share: String? = null,
     guide: Boolean = false,
+    objective: String? = null,
     onSolved: (picture: String) -> Unit,
 ) {
     val session = remember(puzzle) { Session(puzzle, prefs.getString(saveKey, null), legacyId, prefs.getBoolean("complete", true)) }
@@ -146,7 +146,9 @@ internal fun Game(
     val level = if (hint != null && step == null) 0 else hintLevel
     // The lines over the grid keep the room the longest of them took: the grid moves when a hint comes, never under the finger.
     var room by remember(session) { mutableIntStateOf(0) }
-    val context = LocalContext.current
+    var revealVictory by remember(session) { mutableStateOf(false) }
+    var showPostcard by rememberSaveable(puzzle) { mutableStateOf(false) }
+    var sharingStarted by rememberSaveable(puzzle) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
 
@@ -158,8 +160,8 @@ internal fun Game(
     // The music a solved grid stopped comes back with the next screen, whichever it is.
     DisposableEffect(session) { onDispose { audio.resume() } }
     // The time to see the dungeon finished, then on to the next one. Not in calm mode, where nothing moves on its own.
-    LaunchedEffect(session.solved) {
-        if (auto && session.solved && !Comfort.calm && prefs.getBoolean("autoNext", true)) {
+    LaunchedEffect(session, session.solved, sharingStarted) {
+        if (auto && session.solved && !sharingStarted && !Comfort.calm && prefs.getBoolean("autoNext", true)) {
             delay(2_500)
             onNext()
         }
@@ -177,6 +179,7 @@ internal fun Game(
 
     Page(
         title, onBack, back,
+        showTitle = false,
         end = {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (!session.solved) {
@@ -192,42 +195,53 @@ internal fun Game(
             }
         },
         foot = {
-            if (session.solved) {
-                Planks {
-                    PlankButton("Play again", onClick = act { session.reset(); audio.resume() })
-                    PlankButton(next, onClick = onNext)
-                    if (share != null) PlankButton("Share", matter = Matter.PARCHMENT) {
-                        val text = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, shareText(share, session.hints, puzzle))
-                        context.startActivity(Intent.createChooser(text, null))
-                    }
-                }
-            } else {
-                Planks {
-                    Brushes(prefs, brush)
-                    PlankButton("", enabled = session.canUndo, matter = Matter.IRON, glyph = UndoGlyph, description = "Undo", onClick = act(session::undo))
-                    PlankButton("", enabled = session.canRedo, matter = Matter.IRON, glyph = RedoGlyph, description = "Redo", onClick = act(session::redo))
-                }
-                // Apart from the marks and their history: what a try is framed with.
-                Planks {
-                    Checkpoints(session, ::act)
-                    if (hints) {
-                        PlankButton(
-                            if (level == 0) "Hint" else if (level == 1 && step != null) "Why?" else "Show me",
-                            enabled = level == 0 || (step != null && level < 3), matter = Matter.PARCHMENT,
-                        ) {
-                            if (level == 0) {
-                                hint = session.hint()
-                                hintLevel = 1
-                                prefs.edit().putString(saveKey, session.save()).apply()
-                            } else {
-                                hintLevel = level + 1
-                            }
+            Column(
+                Modifier.heightIn(min = 108.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
+            ) {
+                if (session.solved) {
+                    Planks {
+                        PlankButton("Play again", onClick = act {
+                            revealVictory = false
+                            sharingStarted = false
+                            session.reset()
+                            audio.resume()
+                        })
+                        PlankButton(next, onClick = onNext)
+                        if (share != null) PlankButton("Share", matter = Matter.PARCHMENT) {
+                            sharingStarted = true
+                            showPostcard = true
                         }
                     }
-                    if (help) {
-                        PlankButton("Check", enabled = !checked && session.marks.any { it != 0 }, matter = Matter.IRON) {
-                            wrong = session.mistakes()
-                            checked = true
+                } else {
+                    Planks {
+                        Brushes(prefs, brush)
+                        PlankButton("", enabled = session.canUndo, matter = Matter.IRON, glyph = UndoGlyph, description = "Undo", onClick = act(session::undo))
+                        PlankButton("", enabled = session.canRedo, matter = Matter.IRON, glyph = RedoGlyph, description = "Redo", onClick = act(session::redo))
+                    }
+                    // Apart from the marks and their history: what a try is framed with.
+                    Planks {
+                        Checkpoints(session, ::act)
+                        if (hints) {
+                            PlankButton(
+                                if (level == 0) "Hint" else if (level == 1 && step != null) "Why?" else "Show me",
+                                enabled = level == 0 || (step != null && level < 3), matter = Matter.PARCHMENT,
+                            ) {
+                                if (level == 0) {
+                                    hint = session.hint()
+                                    hintLevel = 1
+                                    prefs.edit().putString(saveKey, session.save()).apply()
+                                } else {
+                                    hintLevel = level + 1
+                                }
+                            }
+                        }
+                        if (help) {
+                            PlankButton("Check", enabled = !checked && session.marks.any { it != 0 }, matter = Matter.IRON) {
+                                wrong = session.mistakes()
+                                checked = true
+                            }
                         }
                     }
                 }
@@ -237,12 +251,12 @@ internal fun Game(
         // One node, so that screen readers announce what it turns into.
         Column(
             Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
-                .onSizeChanged { room = maxOf(room, it.height) }.heightIn(min = with(LocalDensity.current) { room.toDp() }),
+                .onSizeChanged { room = maxOf(room, it.height) }.heightIn(min = with(LocalDensity.current) { room.toDp().coerceAtLeast(60.dp) }),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (session.solved) {
-                Text("Dungeon solved!", color = Gold, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Dungeon solved!", color = Gold, fontSize = 24.sp, fontFamily = Fraktur)
                 Text(solvedStatus(), color = Ink)
             } else {
                 // What the check found takes the place of the status while it shows: the grid does not move.
@@ -253,14 +267,19 @@ internal fun Game(
                     level == 1 -> step.nudge(puzzle)
                     else -> step.reason(puzzle)
                 }
-                if (said != null) Text(said, color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center) else Text(status, color = Dim)
+                if (said != null) {
+                    Text(said, color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)
+                } else {
+                    Text(status, Modifier.semantics { heading() }, color = Ink, fontWeight = FontWeight.SemiBold)
+                    if (objective != null) Text(objective, color = Ink, fontSize = 15.sp, textAlign = TextAlign.Center)
+                }
                 if (ruleHint && session.ruleBroken) {
                     Text("Every count is met, yet a rule is broken.", color = Ink, fontStyle = FontStyle.Italic, textAlign = TextAlign.Center)
                 }
             }
         }
         Board(
-            session, locked = session.solved, celebrate = session.solved, variety = variety, wrong = wrong.orEmpty(), brush = brush.intValue,
+            session, locked = session.solved, celebrate = session.solved, revealVictory = revealVictory, variety = variety, wrong = wrong.orEmpty(), brush = brush.intValue,
             focus = when (level) {
                 2 -> step?.from.orEmpty()
                 3 -> toMark.toList()
@@ -273,18 +292,23 @@ internal fun Game(
             },
             onPaint = {
                 wrong = null
-                audio.play(audio.click)
-                if (haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             },
             onStroke = { won ->
                 prefs.edit().putString(saveKey, session.save()).apply()
                 if (won) {
+                    revealVictory = true
                     audio.victory()
                     if (haptics) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSolved(session.picture())
+                } else {
+                    audio.play(audio.click)
+                    if (haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 }
             },
         )
+    }
+    if (showPostcard && session.solved && share != null) {
+        ChallengePostcard(share, session.hints, puzzle, onDismiss = { showPostcard = false })
     }
     if (asking.isNotEmpty()) {
         Notice(asking, { asking = "" }) {

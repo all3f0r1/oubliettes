@@ -70,7 +70,9 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   many of its levels are solved and bears a seal once they all are, then a level. All levels are
   open from the start; the table of levels shows which ones are begun, and a small picture of each
   dungeon you solved. **Next level** skips levels already solved; when none remains after the current
-  level, it returns to the level list. Ten levels make a chapter, five to a difficulty, each with its name.
+  level, it returns to the level list. Ten levels make a chapter, five to a difficulty, each with its name. The Easy campaign also has a three-grid **Treasure Trail** about finding
+  the single opening of a treasure room. The trail uses existing levels and counts toward the same
+  campaign progress.
 - **Endless**: randomly generated grids of the size and of the reasoning you pick first: Gentle, Tricky or
   Fiendish, by the deductions solving them takes: which rules, how many cells have to be tried and how far each try has to be followed. Once a grid is solved the next one comes by itself, until you
   walk out. A grid counts as solved the moment it
@@ -80,7 +82,8 @@ be solved without a guess: at most by trying a cell both ways and seeing one bre
   Dungeons come in several shapes: winding hallways, branches and dead ends, or more treasure rooms.
   **Gallery** keeps the dungeons solved in Endless, in Daily and from a friend. **Enter a code** digs
   the dungeon a friend sent with **Share**, offered on solved Daily and Endless grids: what it was, how many hints
-  it took and the grid itself, never its solution.
+  it took and the grid itself, never its solution. Send the code alone or with an illustrated card
+  previewing the original clues.
 - **Daily**: one dungeon a day, dug from the date, so the same for every player on the same version
   of the game. Only today's is open: a day missed costs nothing.
 - **Tutorial**: lessons, the basics first, then a technique each: treasure rooms, dead ends, narrow

@@ -81,7 +81,13 @@ internal class Session(val puzzle: Puzzle, saved: String? = null, legacyId: Stri
     private var latest = 0
 
     /** The cells the latest action filled by itself, see [complete]. */
-    private var filled = emptySet<Int>()
+    var filled: Set<Int> = emptySet()
+        private set
+    val filledRow: Int?
+        get() = (latest / width).takeIf { row -> alongRow != false && filled.any { it / width == row } }
+    val filledColumn: Int?
+        get() = (latest % width).takeIf { column -> alongRow != true && filled.any { it % width == column } }
+
 
     init {
         fun snapshot(text: String) = text.takeIf { it.length == cells && it.all { c -> c in '0'..'2' } }

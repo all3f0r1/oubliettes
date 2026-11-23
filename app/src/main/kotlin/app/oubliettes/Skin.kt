@@ -80,7 +80,7 @@ internal val IronEdge = Color(0xFF8E8CAA)
 internal object Comfort {
     /** Nothing moves on its own: no sprite animation, no flicker, no hopping. */
     var calm by mutableStateOf(false)
-    var plainDigits by mutableStateOf(false)
+    var plainDigits by mutableStateOf(true)
     var magnifier by mutableStateOf(true)
 }
 

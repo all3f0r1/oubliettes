@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -99,8 +100,11 @@ internal fun Page(
     spider: Boolean = false,
     end: @Composable () -> Unit = {},
     foot: (@Composable ColumnScope.() -> Unit)? = null,
+    showTitle: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
-) = Box(Modifier.safeDrawingPadding().fillMaxSize()) {
+) = Box(Modifier.safeDrawingPadding().fillMaxSize().then(
+    if (showTitle) Modifier else Modifier.semantics { paneTitle = title },
+)) {
     Column(
         Modifier.fillMaxSize().then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -108,7 +112,9 @@ internal fun Page(
         // The title between the two planks, or on a line of its own when it does not fit: large fonts.
         Layout(
             content = {
-                Text(title, Modifier.semantics { heading() }, color = Gold, fontFamily = Fraktur, fontSize = 30.sp, textAlign = TextAlign.Center)
+                Box {
+                    if (showTitle) Text(title, Modifier.semantics { heading() }, color = Gold, fontFamily = Fraktur, fontSize = 30.sp, textAlign = TextAlign.Center)
+                }
                 PlankButton(back, glyph = BackGlyph, onClick = onBack)
                 Box { end() }
             },

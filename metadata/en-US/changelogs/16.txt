@@ -1,0 +1,1 @@
+Watch completed dungeons light up and their chests open. Automatic line fills cascade and highlight their counts. Find the exits of three treasure rooms in the Easy campaign's Treasure Trail. Share a Daily or Endless dungeon as a challenge card, with a code a friend can play offline. Wall counts use plain digits by default.

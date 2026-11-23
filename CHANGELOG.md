@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.10
+
+- Light travels through the finished dungeon and opens its treasure chests. Calm mode shows the
+  finished dungeon immediately.
+- Automatically filled cells appear in a short cascade. The matching counts highlight, and a drag
+  gives one sound and haptic cue when released.
+- The Easy campaign has a three-dungeon Treasure Trail for practising a treasure room's single exit.
+- Share a Daily or Endless dungeon as an illustrated challenge card with its playable code.
+- Play screens give more space to the dungeon and use plain wall counts by default.
 
 - Music starts on the launch screen once the app is resumed and its window has focus, respecting
   the saved volume and other apps' audio.

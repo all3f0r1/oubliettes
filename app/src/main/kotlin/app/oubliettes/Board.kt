@@ -1,10 +1,7 @@
 package app.oubliettes
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -19,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -58,7 +57,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
 
@@ -304,7 +302,7 @@ internal fun DrawScope.drawEyes(monster: Monster, tick: Int, index: Int, cell: F
  * is called every time cells were painted, [onStroke] once the stroke is over, with whether it solved
  * the grid. [variety] picks which monsters and flagstones a grid shows, [stone] what it is built of; [focus] cells get a gold
  * outline, and those among them still [toMark] are said so to screen readers. [wrong] cells are
- * crossed in red. [celebrate] shows the finished dungeon: no dots, monsters on the alert, chest pulsing.
+ * crossed in red. [celebrate] shows the finished dungeon with its chests open. [revealVictory] animates the reveal.
  * The cells of the try under way, see [Session.tried], bear a parchment corner. A tap on a count is [onCount].
  *
  * Two fingers spread a grid whose cells are small, and move it about: the counts stay along the
@@ -318,6 +316,7 @@ internal fun Board(
     session: Session,
     locked: Boolean,
     celebrate: Boolean = false,
+    revealVictory: Boolean = false,
     variety: Int = 0,
     stone: Stone = Stone.of(session.puzzle.width),
     focus: List<Int> = emptyList(),
@@ -344,11 +343,35 @@ internal fun Board(
     val currentBrush by rememberUpdatedState(brush)
     val currentCount by rememberUpdatedState(onCount)
     val tried = if (celebrate) emptySet() else session.tried
-    val beat = if (celebrate && !Comfort.calm) {
-        rememberInfiniteTransition(label = "celebrate")
-            .animateFloat(0f, 1f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart), label = "beat")
-    } else {
-        null
+    val openedChest = painterResource(R.drawable.chest_open)
+    val reveal = remember(session) { Animatable(0f) }
+    val distances = remember(session, celebrate) {
+        if (celebrate) dungeonDistances(marks, p.width, p.height) else IntArray(0)
+    }
+    val lastDistance = distances.maxOrNull()?.coerceAtLeast(1) ?: 1
+    LaunchedEffect(session, celebrate, revealVictory, Comfort.calm) {
+        reveal.snapTo(0f)
+        if (celebrate && revealVictory && !Comfort.calm) {
+            reveal.animateTo(1f, tween(1100, easing = LinearEasing))
+        }
+    }
+
+    var fillOrder by remember(session) { mutableStateOf(emptyMap<Int, Int>()) }
+    var fillStroke by remember(session) { mutableIntStateOf(0) }
+    fun finish(won: Boolean) {
+        if (session.filled.isNotEmpty() && !Comfort.calm) {
+            fillOrder = session.filled.withIndex().associate { (order, cell) -> cell to order }
+            fillStroke++
+        }
+        currentStroke(won)
+    }
+    val currentFinish by rememberUpdatedState(::finish)
+    val fillProgress = remember(session, fillStroke) { Animatable(0f) }
+    LaunchedEffect(session, fillStroke) {
+        if (fillStroke > 0) {
+            fillProgress.animateTo(1f, tween(300, easing = LinearEasing))
+            fillOrder = emptyMap()
+        }
     }
     val columns = p.width + 1 // one extra row and column for the wall counts
     // The cell touched last: its row and its column are lit up to their counts.
@@ -359,6 +382,12 @@ internal fun Board(
     // How much the grid is spread, and how far it was moved: both back to nothing with the next grid.
     var zoom by remember(session) { mutableFloatStateOf(1f) }
     var pan by remember(session) { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(celebrate) {
+        if (celebrate) {
+            zoom = 1f
+            pan = Offset.Zero
+        }
+    }
     val cellWidth = with(LocalDensity.current) { boardWidth.toDp() } / columns
     val maxZoom = if (boardWidth > 0 && !locked) (ZOOMED / cellWidth).coerceAtLeast(1f) else 1f
     // Cells that small hide under a fingertip: 10×10 and 12×12 on a phone.
@@ -401,6 +430,7 @@ internal fun Board(
                     if (!session.begin(first, currentBrush)) return@awaitEachGesture
                     down.consume()
                     touched = first
+                    fillOrder = emptyMap()
                     finger = down.position
                     currentPaint()
                     try {
@@ -435,7 +465,7 @@ internal fun Board(
                         }
                     } finally {
                         finger = Offset.Unspecified
-                        if (!spreading) currentStroke(session.end())
+                        if (!spreading) currentFinish(session.end())
                     }
                 }
             },
@@ -455,9 +485,18 @@ internal fun Board(
 
             // A count reached is dimmed and struck through, out of the way; exceeded, it is red and
             // underlined: the line says it without the colour.
-            fun count(want: Int, have: Int, centerX: Float, centerY: Float) {
+            val filled = if (!celebrate && !Comfort.calm) fillOrder.keys.intersect(session.filled) else emptySet()
+            val cascade = fillProgress.value
+            val revealTime = if (Comfort.calm || !revealVictory) 1f else reveal.value
+            fun count(want: Int, have: Int, centerX: Float, centerY: Float, justFilled: Boolean) {
                 val text = measurer.measure(want.toString(), style)
-                val color = if (have == want) Dim else if (have > want) Red else Ink
+                val color = when {
+                    celebrate -> Dim.copy(alpha = 1f - 0.84f * revealTime)
+                    justFilled -> lerp(Gold, Dim, cascade)
+                    have == want -> Dim
+                    have > want -> Red
+                    else -> Ink
+                }
                 drawText(text, color, Offset(centerX - text.size.width / 2f, centerY - text.size.height / 2f))
                 val half = cell * 0.26f
                 val line = if (have > want) centerY + cell * 0.36f else centerY
@@ -467,28 +506,33 @@ internal fun Board(
             clipRect(left = cell, bottom = cell) {
                 lit?.let { drawRect(band, Offset(cell + pan.x + it % p.width * wide, 0f), Size(wide, cell)) }
                 for (x in 0 until p.width) {
-                    count(p.colCounts[x], (0 until p.height).count { marks[it * p.width + x] == WALL }, cell + pan.x + (x + 0.5f) * wide, cell / 2)
+                    count(p.colCounts[x], (0 until p.height).count { marks[it * p.width + x] == WALL }, cell + pan.x + (x + 0.5f) * wide, cell / 2, x == session.filledColumn && filled.isNotEmpty())
                 }
             }
             clipRect(top = cell, right = cell) {
                 lit?.let { drawRect(band, Offset(0f, cell + pan.y + it / p.width * wide), Size(cell, wide)) }
                 for (y in 0 until p.height) {
-                    count(p.rowCounts[y], (0 until p.width).count { marks[y * p.width + it] == WALL }, cell / 2, cell + pan.y + (y + 0.5f) * wide)
+                    count(p.rowCounts[y], (0 until p.width).count { marks[y * p.width + it] == WALL }, cell / 2, cell + pan.y + (y + 0.5f) * wide, y == session.filledRow && filled.isNotEmpty())
                 }
             }
 
             clipRect(left = cell, top = cell) {
                 translate(pan.x, pan.y) {
                     scale(zoom, Offset(cell, cell)) {
-                        val t = beat?.value ?: 0f
                         val frame = tick.value
                         val time = clock.value
                         for (i in marks.indices) {
                             val left = (i % p.width + 1) * cell
                             val top = (i / p.width + 1) * cell
                             val given = i in p.chests || i in p.monsters
-                            val paved = given || marks[i] == KNOWN_OPEN || celebrate
-                            if (marks[i] != WALL) {
+                            val order = fillOrder[i]?.takeIf { i in filled }
+                            val shown = if (order == null) 1f else (cascade * (filled.size + 3) - order).div(4f).coerceIn(0f, 1f)
+                            val mark = if (shown == 0f) 0 else marks[i]
+                            val paved = given || mark == KNOWN_OPEN || celebrate
+                            val light = if (celebrate && distances[i] >= 0) {
+                                (revealTime * 1.22f - distances[i].toFloat() / lastDistance).div(0.22f).coerceIn(0f, 1f)
+                            } else 0f
+                            if (mark != WALL) {
                                 drawFloor(
                                     if (paved) paving[(i * 7 + variety).mod(paving.size)] else unknown, left, top, cell,
                                     above = i >= p.width && marks[i - p.width] == WALL, beside = i % p.width > 0 && marks[i - 1] == WALL,
@@ -499,23 +543,26 @@ internal fun Board(
                                     drawRect(band, Offset(left, top), Size(cell, cell))
                                 }
                             }
-                            // Celebration: monsters stand on the alert, chests pulse.
-                            val moving = beat != null && marks[i] != WALL
+                            if (light > 0f) {
+                                drawRect(Gold.copy(alpha = 0.15f * light), Offset(left, top), Size(cell, cell))
+                            }
                             when {
-                                marks[i] == WALL -> translate(left, top) { with(walls[wallNeighbourMask(i, p.width, p.height, marks)]) { draw(Size(cell, cell)) } }
+                                mark == WALL -> translate(left, top) { with(walls[wallNeighbourMask(i, p.width, p.height, marks)]) { draw(Size(cell, cell)) } }
                                 i in p.chests -> translate(left, top) {
                                     drawShadow(cell)
-                                    val pulse = if (moving) 1f + 0.1f * sin(2 * PI.toFloat() * t) else 1f
-                                    // A glint crosses the chest every five seconds, each chest in its turn.
                                     val glint = (frame + i * 13) % 34
-                                    scale(pulse, Offset(cell / 2, cell / 2)) { with(chest[if (glint < 3) glint + 1 else 0]) { draw(Size(cell, cell)) } }
+                                    val sprite = if (light >= 0.6f) openedChest else chest[if (glint < 3) glint + 1 else 0]
+                                    with(sprite) { draw(Size(cell, cell)) }
                                 }
                                 i in p.monsters -> {
                                     val order = monsterOrder.indexOf(i)
                                     translate(left, top) { drawMonster((order + variety).mod(MONSTERS.size), bodies, frame, order, cell, time, alert = celebrate) }
                                 }
                             }
-                            if (marks[i] == KNOWN_OPEN && !celebrate) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))
+                            if (mark == KNOWN_OPEN && !celebrate) drawCircle(Ink, cell * 0.09f, Offset(left + cell / 2, top + cell / 2))
+                            if (order != null && shown > 0f && cascade < 1f) {
+                                drawRect(Gold.copy(alpha = 0.28f * shown * (1f - cascade)), Offset(left, top), Size(cell, cell))
+                            }
                             if (i in tried) {
                                 // A corner of parchment turned down: laid since the checkpoint.
                                 val fold = cell * 0.3f
@@ -580,12 +627,14 @@ internal fun Board(
                                 (if (i in toMark) ", to mark" else "") + (if (i in wrong) ", mistake" else "") + if (i in tried) ", tried" else ""
                             if (!given && !locked) {
                                 fun mark(label: String, value: Int) = CustomAccessibilityAction(label) {
-                                    currentStroke(session.paint(listOf(i), value))
+                                    val before = session.marks
+                                    val won = session.paint(listOf(i), value)
+                                    if (session.marks !== before) currentFinish(won)
                                     true
                                 }
                                 onClick("change") {
                                     session.begin(i)
-                                    currentStroke(session.end())
+                                    currentFinish(session.end())
                                     true
                                 }
                                 customActions = listOf(mark("Wall", WALL), mark("Open", KNOWN_OPEN), mark("Unknown", 0))
@@ -608,4 +657,31 @@ internal fun Board(
             }
         }
     }
+}
+
+/** How far each open cell is from the first open cell, following the dungeon's passages. */
+internal fun dungeonDistances(marks: IntArray, width: Int, height: Int): IntArray {
+    val distances = IntArray(marks.size) { -1 }
+    val entrance = marks.indexOfFirst { it != WALL }
+    if (entrance < 0) return distances
+
+    val pending = ArrayDeque<Int>()
+    pending.add(entrance)
+    distances[entrance] = 0
+    while (pending.isNotEmpty()) {
+        val cell = pending.removeFirst()
+        val row = cell / width
+        val column = cell % width
+        fun visit(next: Int) {
+            if (marks[next] != WALL && distances[next] < 0) {
+                distances[next] = distances[cell] + 1
+                pending.add(next)
+            }
+        }
+        if (column > 0) visit(cell - 1)
+        if (column + 1 < width) visit(cell + 1)
+        if (row > 0) visit(cell - width)
+        if (row + 1 < height) visit(cell + width)
+    }
+    return distances
 }

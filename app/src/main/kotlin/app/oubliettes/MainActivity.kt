@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
         // Calm by default when the system animations are turned off.
         val still = Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         Comfort.calm = prefs.getBoolean("calm", still)
-        Comfort.plainDigits = prefs.getBoolean("plainDigits", false)
+        Comfort.plainDigits = prefs.getBoolean("plainDigits", true)
         Comfort.magnifier = prefs.getBoolean("magnifier", true)
         if (prefs.getInt("campaign", 1) < CAMPAIGN) {
             // Levels solved or begun in the former campaign would land on grids they were never played on:
